@@ -1,0 +1,30 @@
+# .env should never be committed
+.env
+.env.local
+.env.production
+
+# Dependencies
+node_modules
+
+# Build
+.next
+out
+
+# Docker volumes (persisted data)
+.docker-data/
+
+# WAHA sessions
+.sessions/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+
+# Misc
+*.log
+extract_docx.ps1
+PRD_extracted.txt

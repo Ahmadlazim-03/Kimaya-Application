@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+:root {
+  /* Kimaya Brand Colors */
+  --kimaya-olive: #5B633D;
+  --kimaya-olive-light: #7A8255;
+  --kimaya-olive-dark: #454B2E;
+  --kimaya-brown: #2D1B17;
+  --kimaya-brown-light: #4A3530;
+  --kimaya-cream: #E8E6DE;
+  --kimaya-cream-light: #F5F4F0;
+  --kimaya-cream-dark: #D4D1C5;
+  --kimaya-gold: #C5A059;
+  --kimaya-gold-light: #D4B574;
+  --kimaya-white: #FAFAF8;
+
+  /* Semantic Colors */
+  --color-success: #5B633D;
+  --color-warning: #C5A059;
+  --color-danger: #B44D4D;
+  --color-info: #5A7D9A;
+
+  /* Layout */
+  --sidebar-width: 280px;
+  --header-height: 72px;
+
+  --background: var(--kimaya-cream-light);
+  --foreground: var(--kimaya-brown);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-kimaya-olive: var(--kimaya-olive);
+  --color-kimaya-olive-light: var(--kimaya-olive-light);
+  --color-kimaya-olive-dark: var(--kimaya-olive-dark);
+  --color-kimaya-brown: var(--kimaya-brown);
+  --color-kimaya-brown-light: var(--kimaya-brown-light);
+  --color-kimaya-cream: var(--kimaya-cream);
+  --color-kimaya-cream-light: var(--kimaya-cream-light);
+  --color-kimaya-cream-dark: var(--kimaya-cream-dark);
+  --color-kimaya-gold: var(--kimaya-gold);
+  --color-kimaya-gold-light: var(--kimaya-gold-light);
+  --color-kimaya-white: var(--kimaya-white);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-info: var(--color-info);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--kimaya-cream);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--kimaya-olive-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--kimaya-olive);
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.4s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+/* Staggered animations */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* Glass effect */
+.glass {
+  background: rgba(250, 250, 248, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Skeleton loading */
+.skeleton {
+  background: linear-gradient(90deg, var(--kimaya-cream) 25%, var(--kimaya-cream-light) 50%, var(--kimaya-cream) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}

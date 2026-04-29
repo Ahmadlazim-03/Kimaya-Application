@@ -1,0 +1,378 @@
+// ============================================
+// SIYAP — Prisma Schema
+// Kimaya Experience Employee Management Platform
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Enums ----
+
+enum UserRole {
+  SUPER_ADMIN
+  HR_ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  PROBATION
+  INACTIVE
+  TERMINATED
+}
+
+enum AttendanceStatus {
+  ON_TIME
+  LATE
+  EARLY
+  HALF_DAY
+  ABSENT
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  EMERGENCY
+  COMPANY
+  WFH
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ReportCategory {
+  CLIENT_VISIT
+  PROJECT_PROGRESS
+  DAILY_REPORT
+  EXPENSE_PROOF
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REVISION_REQUIRED
+}
+
+enum ReminderChannel {
+  WHATSAPP
+  WHATSAPP_WEB
+  WHATSAPP_EMAIL
+  EMAIL
+}
+
+enum ReminderSchedule {
+  IMMEDIATE
+  DAILY
+  WEEKLY
+  CUSTOM_CRON
+}
+
+enum ReminderActiveStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
+// ---- Models ----
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+
+  users       User[]
+  scoreConfig ScoreConfig?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("departments")
+}
+
+model Location {
+  id              String   @id @default(uuid())
+  name            String   @db.VarChar(100)
+  address         String?  @db.Text
+  latitude        Decimal? @db.Decimal(10, 8)
+  longitude       Decimal? @db.Decimal(11, 8)
+  geofenceRadiusM Int      @default(100) @map("geofence_radius_m")
+
+  users           User[]
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("locations")
+}
+
+model User {
+  id               String     @id @default(uuid())
+  email            String     @unique @db.VarChar(255)
+  passwordHash     String?    @map("password_hash") @db.VarChar(255)
+  fullName         String     @map("full_name") @db.VarChar(200)
+  phone            String?    @db.VarChar(20)
+  avatarUrl        String?    @map("avatar_url") @db.Text
+  role             UserRole   @default(EMPLOYEE)
+  status           UserStatus @default(ACTIVE)
+  joinDate         DateTime   @default(now()) @map("join_date") @db.Date
+  probationEndDate DateTime?  @map("probation_end_date") @db.Date
+  googleId         String?    @map("google_id") @db.VarChar(255)
+  lastLoginAt      DateTime?  @map("last_login_at")
+
+  department       Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  departmentId     String?     @map("department_id")
+  location         Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  locationId       String?     @map("location_id")
+
+  attendances        Attendance[]
+  leaveRequests      LeaveRequest[]       @relation("UserLeaves")
+  approvedLeaves     LeaveRequest[]       @relation("ApprovedLeaves")
+  reports            Report[]             @relation("UserReports")
+  reviewedReports    Report[]             @relation("ReviewedReports")
+  scores             EmployeeScore[]
+  initiativeGiven    InitiativePoint[]    @relation("GivenBy")
+  initiativeReceived InitiativePoint[]    @relation("ReceivedBy")
+  remindersCreated   Reminder[]
+  reminderLogs       ReminderLog[]
+  auditLogs          AuditLog[]
+  attendanceApprovals Attendance[]        @relation("AttendanceApprovals")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([departmentId])
+  @@index([locationId])
+  @@index([status])
+  @@map("users")
+}
+
+model Attendance {
+  id             String           @id @default(uuid())
+  userId         String           @map("user_id")
+  date           DateTime         @default(now()) @db.Date
+  checkInTime    DateTime?        @map("check_in_time")
+  checkOutTime   DateTime?        @map("check_out_time")
+  checkInLat     Decimal?         @map("check_in_lat") @db.Decimal(10, 8)
+  checkInLng     Decimal?         @map("check_in_lng") @db.Decimal(11, 8)
+  checkOutLat    Decimal?         @map("check_out_lat") @db.Decimal(10, 8)
+  checkOutLng    Decimal?         @map("check_out_lng") @db.Decimal(11, 8)
+  checkInSelfie  String?          @map("check_in_selfie_url") @db.Text
+  checkInMethod  String           @default("WEB") @map("check_in_method") @db.VarChar(20)
+  status         AttendanceStatus @default(ABSENT)
+  notes          String?          @db.Text
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approvedBy     User?            @relation("AttendanceApprovals", fields: [approvedById], references: [id])
+  approvedById   String?          @map("approved_by")
+
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@index([status])
+  @@map("attendances")
+}
+
+model LeaveRequest {
+  id              String      @id @default(uuid())
+  userId          String      @map("user_id")
+  type            LeaveType
+  startDate       DateTime    @map("start_date") @db.Date
+  endDate         DateTime    @map("end_date") @db.Date
+  reason          String?     @db.Text
+  attachmentUrl   String?     @map("attachment_url") @db.Text
+  status          LeaveStatus @default(PENDING)
+  rejectionReason String?     @map("rejection_reason") @db.Text
+  approvedAt      DateTime?   @map("approved_at")
+
+  user            User        @relation("UserLeaves", fields: [userId], references: [id], onDelete: Cascade)
+  approvedBy      User?       @relation("ApprovedLeaves", fields: [approvedById], references: [id])
+  approvedById    String?     @map("approved_by")
+
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("leave_requests")
+}
+
+model Report {
+  id            String         @id @default(uuid())
+  userId        String         @map("user_id")
+  title         String         @db.VarChar(300)
+  category      ReportCategory
+  description   String?        @db.Text
+  fileUrl       String?        @map("file_url") @db.Text
+  fileName      String?        @map("file_name") @db.VarChar(255)
+  fileSize      Int?           @map("file_size")
+  fileType      String?        @map("file_type") @db.VarChar(20)
+  status        ReportStatus   @default(DRAFT)
+  submittedAt   DateTime?      @map("submitted_at")
+  reviewComment String?        @map("review_comment") @db.Text
+  reviewedAt    DateTime?      @map("reviewed_at")
+  uploadSource  String         @default("WEB") @map("upload_source") @db.VarChar(20)
+  metadata      Json?
+
+  user          User           @relation("UserReports", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy    User?          @relation("ReviewedReports", fields: [reviewedById], references: [id])
+  reviewedById  String?        @map("reviewed_by")
+
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+  @@index([submittedAt])
+  @@map("reports")
+}
+
+model ScoreConfig {
+  id                       String      @id @default(uuid())
+  departmentId             String?     @unique @map("department_id")
+  attendanceWeight         Int         @default(30) @map("attendance_weight")
+  reportCompletenessWeight Int         @default(25) @map("report_completeness_weight")
+  reportQualityWeight      Int         @default(20) @map("report_quality_weight")
+  responseSpeedWeight      Int         @default(15) @map("response_speed_weight")
+  initiativeWeight         Int         @default(10) @map("initiative_weight")
+  thresholdAlert           Int         @default(70) @map("threshold_alert")
+
+  department               Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  createdAt                DateTime    @default(now()) @map("created_at")
+  updatedAt                DateTime    @updatedAt @map("updated_at")
+
+  @@map("score_configs")
+}
+
+model EmployeeScore {
+  id                      String   @id @default(uuid())
+  userId                  String   @map("user_id")
+  periodDate              DateTime @map("period_date") @db.Date
+  attendanceScore         Decimal  @default(0) @map("attendance_score") @db.Decimal(5, 2)
+  reportCompletenessScore Decimal  @default(0) @map("report_completeness_score") @db.Decimal(5, 2)
+  reportQualityScore      Decimal  @default(0) @map("report_quality_score") @db.Decimal(5, 2)
+  responseSpeedScore      Decimal  @default(0) @map("response_speed_score") @db.Decimal(5, 2)
+  initiativeScore         Decimal  @default(0) @map("initiative_score") @db.Decimal(5, 2)
+  totalScore              Decimal  @default(0) @map("total_score") @db.Decimal(5, 2)
+  grade                   String?  @db.Char(1)
+  computedAt              DateTime @default(now()) @map("computed_at")
+
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, periodDate])
+  @@index([userId])
+  @@index([periodDate])
+  @@index([totalScore])
+  @@map("employee_scores")
+}
+
+model InitiativePoint {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  givenById  String   @map("given_by")
+  points     Int
+  reason     String   @db.Text
+  periodDate DateTime @map("period_date") @db.Date
+
+  user       User     @relation("ReceivedBy", fields: [userId], references: [id], onDelete: Cascade)
+  givenBy    User     @relation("GivenBy", fields: [givenById], references: [id])
+
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("initiative_points")
+}
+
+model Reminder {
+  id                String               @id @default(uuid())
+  title             String               @db.VarChar(200)
+  messageTemplate   String               @map("message_template") @db.Text
+  targetRole        UserRole?            @map("target_role")
+  targetDepartmentId String?             @map("target_department_id")
+  targetUserId      String?              @map("target_user_id")
+  channel           ReminderChannel      @default(WHATSAPP)
+  scheduleType      ReminderSchedule     @default(DAILY) @map("schedule_type")
+  cronExpression    String?              @map("cron_expression") @db.VarChar(50)
+  scheduledTime     DateTime?            @map("scheduled_time") @db.Time()
+  scheduledDay      Int?                 @map("scheduled_day")
+  status            ReminderActiveStatus @default(ACTIVE)
+  lastSentAt        DateTime?            @map("last_sent_at")
+
+  createdBy         User?                @relation(fields: [createdById], references: [id])
+  createdById       String?              @map("created_by")
+
+  logs              ReminderLog[]
+
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  @@map("reminders")
+}
+
+model ReminderLog {
+  id            String          @id @default(uuid())
+  reminderId    String          @map("reminder_id")
+  userId        String          @map("user_id")
+  sentAt        DateTime        @default(now()) @map("sent_at")
+  channel       ReminderChannel
+  status        String          @default("SENT") @db.VarChar(20)
+  errorMessage  String?         @map("error_message") @db.Text
+  wahaMessageId String?         @map("waha_message_id") @db.VarChar(100)
+
+  reminder      Reminder        @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([reminderId])
+  @@index([sentAt])
+  @@map("reminder_logs")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String   @db.VarChar(50)
+  entityType String?  @map("entity_type") @db.VarChar(50)
+  entityId   String?  @map("entity_id")
+  details    Json?
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  userAgent  String?  @map("user_agent") @db.Text
+
+  user       User?    @relation(fields: [userId], references: [id])
+
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemConfig {
+  key         String   @id @db.VarChar(100)
+  value       String   @db.Text
+  description String?  @db.Text
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_config")
+}

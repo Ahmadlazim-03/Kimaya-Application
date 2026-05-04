@@ -7,5 +7,5 @@ node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-
 echo "🌱 Running seed script..."
 node prisma/seed.js 2>&1 || echo "⚠️ Seed encountered an issue"
 
-echo "🚀 Starting SIYAP application..."
+echo "🚀 Starting Management application..."
 exec node server.js

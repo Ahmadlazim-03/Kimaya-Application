@@ -1,5 +1,5 @@
 -- ============================================
--- SIYAP Database Initialization Script
+-- Management Database Initialization Script
 -- PostgreSQL 16 — Kimaya Experience
 -- ============================================
 
@@ -448,8 +448,8 @@ BEGIN
     ('Deadline Laporan Mingguan', 'Halo {nama}, deadline upload laporan mingguan hari Jumat jam 14:00. Jangan sampai terlewat! 📝', 'WHATSAPP_WEB', 'WEEKLY', '14:00', 'ACTIVE', uid_admin, CURRENT_DATE - 4 + TIME '14:00'),
     ('Rekap Skor Mingguan', 'Hi {nama}, skor performa minggu ini: {skor}. Pertahankan atau tingkatkan ya! ⭐', 'WHATSAPP', 'WEEKLY', '08:00', 'ACTIVE', uid_admin, CURRENT_DATE - 1 + TIME '08:00'),
     ('Reminder Check-Out', 'Hai {nama}, sudah waktunya pulang! Jangan lupa check-out ya 🏠', 'WHATSAPP', 'DAILY', '16:50', 'PAUSED', uid_admin, CURRENT_DATE - 9 + TIME '16:50'),
-    ('Pengingat Approval Cuti', 'Ada pengajuan cuti yang menunggu approval Anda. Silakan cek dashboard SIYAP 📋', 'WHATSAPP_EMAIL', 'DAILY', '09:00', 'ACTIVE', uid_admin, CURRENT_DATE + TIME '09:00');
+    ('Pengingat Approval Cuti', 'Ada pengajuan cuti yang menunggu approval Anda. Silakan cek dashboard Kimaya Management 📋', 'WHATSAPP_EMAIL', 'DAILY', '09:00', 'ACTIVE', uid_admin, CURRENT_DATE + TIME '09:00');
 
-  RAISE NOTICE 'SIYAP database seeded successfully!';
+  RAISE NOTICE 'Management database seeded successfully!';
   RAISE NOTICE 'Default password for all users: kimaya123';
 END $$;

@@ -80,7 +80,7 @@ export default function LoginPage() {
         <div className="relative z-10 space-y-6">
           <h2 className="text-4xl xl:text-5xl font-serif text-kimaya-cream leading-tight">
             Selamat Datang di<br />
-            <span className="text-kimaya-gold">SIYAP</span>
+            <span className="text-kimaya-gold">Kimaya Management</span>
           </h2>
           <p className="text-kimaya-cream/70 text-lg leading-relaxed max-w-lg">
             Sistem Absensi, Reminder, Upload Bukti Report &amp; Skoring Karyawan —
@@ -122,7 +122,7 @@ export default function LoginPage() {
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-serif text-kimaya-brown">Kimaya SIYAP</h1>
+              <h1 className="text-xl font-serif text-kimaya-brown">Kimaya Management</h1>
             </div>
           </div>
 

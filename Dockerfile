@@ -1,5 +1,5 @@
 # ============================================
-# SIYAP Next.js Application — Multi-stage Dockerfile
+# Management Next.js Application — Multi-stage Dockerfile
 # ============================================
 
 # --- Stage 1: Dependencies ---

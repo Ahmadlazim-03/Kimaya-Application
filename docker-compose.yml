@@ -1,9 +1,9 @@
 # ============================================
-# SIYAP — Docker Compose
+# Management — Docker Compose
 # Kimaya Experience Employee Management Platform
 # ============================================
 # Services:
-#   1. siyap-app    → Next.js Frontend (port 3000)
+#   1. management-app    → Next.js Frontend (port 3000)
 #   2. waha         → WhatsApp HTTP API NoWeb (port 3001)
 #   3. postgres     → PostgreSQL 16 Database (port 5432)
 #   4. redis        → Redis 7 Cache & Queue (port 6379)
@@ -13,30 +13,30 @@ services:
   # ---- PostgreSQL 16 ----
   postgres:
     image: postgres:16-alpine
-    container_name: siyap-postgres
+    container_name: management-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DATABASE_NAME:-siyap_db}
-      POSTGRES_USER: ${DATABASE_USER:-siyap_admin}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-SiyapKimaya2026!}
+      POSTGRES_DB: ${DATABASE_NAME:-management_db}
+      POSTGRES_USER: ${DATABASE_USER:-management_admin}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-ManagementKimaya2026!}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-siyap_admin} -d ${DATABASE_NAME:-siyap_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-management_admin} -d ${DATABASE_NAME:-management_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     networks:
-      - siyap-network
+      - management-network
 
   # ---- Redis 7 ----
   redis:
     image: redis:7-alpine
-    container_name: siyap-redis
+    container_name: management-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
@@ -49,12 +49,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - siyap-network
+      - management-network
 
   # ---- WAHA (WhatsApp HTTP API — NoWeb Engine) ----
   waha:
     image: devlikeapro/waha
-    container_name: siyap-waha
+    container_name: management-waha
     restart: unless-stopped
     environment:
       # Engine NoWeb — lightweight, no Chromium needed (~256MB RAM)
@@ -63,9 +63,9 @@ services:
       WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
       WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:-KimayaWaha2026!}
       # API Key for REST calls
-      WAHA_API_KEY: ${WAHA_API_KEY:-kimaya-siyap-api-key-2026}
+      WAHA_API_KEY: ${WAHA_API_KEY:-kimaya-management-api-key-2026}
       # Webhook to forward incoming messages to the app
-      WHATSAPP_HOOK_URL: http://siyap-app:3000/api/webhooks/whatsapp
+      WHATSAPP_HOOK_URL: http://management-app:3000/api/webhooks/whatsapp
       WHATSAPP_HOOK_EVENTS: "message,message.ack,session.status"
       # Auto-start default session
       WHATSAPP_START_SESSION: default
@@ -78,22 +78,22 @@ services:
     depends_on:
       - redis
     networks:
-      - siyap-network
+      - management-network
 
-  # ---- SIYAP Next.js Application ----
-  siyap-app:
+  # ---- Management Next.js Application ----
+  management-app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: siyap-app
+    container_name: management-app
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${DATABASE_USER:-siyap_admin}:${DATABASE_PASSWORD:-SiyapKimaya2026!}@postgres:5432/${DATABASE_NAME:-siyap_db}?schema=public
+      DATABASE_URL: postgresql://${DATABASE_USER:-management_admin}:${DATABASE_PASSWORD:-ManagementKimaya2026!}@postgres:5432/${DATABASE_NAME:-management_db}?schema=public
       REDIS_URL: redis://redis:6379
       WAHA_API_URL: http://waha:3000
-      WAHA_API_KEY: ${WAHA_API_KEY:-kimaya-siyap-api-key-2026}
-      JWT_SECRET: ${JWT_SECRET:-kimaya-siyap-jwt-secret-change-in-production-2026}
+      WAHA_API_KEY: ${WAHA_API_KEY:-kimaya-management-api-key-2026}
+      JWT_SECRET: ${JWT_SECRET:-kimaya-management-jwt-secret-change-in-production-2026}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-30d}
     ports:
@@ -106,7 +106,7 @@ services:
       waha:
         condition: service_started
     networks:
-      - siyap-network
+      - management-network
 
 # ---- Volumes (Persistent Data) ----
 volumes:
@@ -119,5 +119,5 @@ volumes:
 
 # ---- Network ----
 networks:
-  siyap-network:
+  management-network:
     driver: bridge

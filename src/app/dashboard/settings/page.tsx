@@ -76,7 +76,7 @@ export default function SettingsPage() {
 
       <motion.div variants={item}>
         <h1 className="text-2xl font-serif text-kimaya-brown">Pengaturan</h1>
-        <p className="text-sm text-kimaya-brown-light/60 mt-1">Konfigurasi sistem SIYAP</p>
+        <p className="text-sm text-kimaya-brown-light/60 mt-1">Konfigurasi sistem Kimaya Management</p>
       </motion.div>
 
       {/* Tabs */}

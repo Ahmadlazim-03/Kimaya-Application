@@ -2,9 +2,9 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "kimaya-siyap-jwt-secret-change-in-production-2026"
+  process.env.JWT_SECRET || "kimaya-management-jwt-secret-change-in-production-2026"
 );
-const COOKIE_NAME = "siyap-session";
+const COOKIE_NAME = "management-session";
 const EXPIRY = "8h";
 
 // ---- Types ----

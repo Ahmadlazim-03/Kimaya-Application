@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SIYAP — Kimaya Experience",
-  description:
-    "Sistem Absensi, Reminder, Upload Bukti Report & Skoring Karyawan — Kimaya Spa & Beauty Experience",
+  title: "Kimaya Management — Kimaya Experience",
+  description: "Employee Management & Productivity Platform for Kimaya Experience",
   icons: { icon: "/favicon.ico" },
 };
 

@@ -15,7 +15,7 @@ export async function GET() {
       weeklyAttendance,
     ] = await Promise.all([
       // Total active employees
-      prisma.user.count({ where: { status: { in: ["ACTIVE", "PROBATION"] }, role: "EMPLOYEE" } }),
+      prisma.user.count({ where: { status: { in: ["ACTIVE", "PROBATION"] }, role: { in: ["THERAPIST", "DEVELOPER"] } } }),
 
       // Today's attendance
       prisma.attendance.findMany({

@@ -3,65 +3,39 @@ import prisma from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const configs = await prisma.systemConfig.findMany();
-    const configMap = configs.reduce((acc, curr) => {
-      acc[curr.key] = curr.value;
-      return acc;
-    }, {} as Record<string, string>);
-    
-    const scoreConfig = await prisma.scoreConfig.findFirst({ where: { departmentId: null } });
-
-    return NextResponse.json({
-      systemConfig: configMap,
-      scoreConfig: scoreConfig || {
-        attendanceWeight: 30,
-        reportCompletenessWeight: 25,
-        reportQualityWeight: 20,
-        responseSpeedWeight: 15,
-        initiativeWeight: 10,
-        thresholdAlert: 70
-      }
-    });
+    const [configs, scoreConfig] = await Promise.all([
+      prisma.systemConfig.findMany(),
+      prisma.scoreConfig.findFirst({ where: { departmentId: null } }),
+    ]);
+    const configMap: Record<string, string> = {};
+    for (const c of configs) configMap[c.key] = c.value;
+    return NextResponse.json({ system: configMap, scoring: scoreConfig });
   } catch (error) {
-    console.error("Settings API error:", error);
+    console.error("Settings GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
+export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { systemConfig, scoreConfig } = body;
-
-    // Update system configs
-    if (systemConfig) {
-      for (const [key, value] of Object.entries(systemConfig)) {
+    if (body.system) {
+      for (const [key, value] of Object.entries(body.system)) {
         await prisma.systemConfig.upsert({
-          where: { key },
-          update: { value: String(value) },
-          create: { key, value: String(value) }
+          where: { key }, update: { value: String(value) }, create: { key, value: String(value) },
         });
       }
     }
-
-    // Update score config
-    if (scoreConfig) {
+    if (body.scoring) {
+      const sc = body.scoring;
       const existing = await prisma.scoreConfig.findFirst({ where: { departmentId: null } });
       if (existing) {
-        await prisma.scoreConfig.update({
-          where: { id: existing.id },
-          data: scoreConfig
-        });
-      } else {
-        await prisma.scoreConfig.create({
-          data: scoreConfig
-        });
+        await prisma.scoreConfig.update({ where: { id: existing.id }, data: sc });
       }
     }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ message: "Pengaturan berhasil disimpan" });
   } catch (error) {
-    console.error("Settings API POST error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("Settings PUT error:", error);
+    return NextResponse.json({ error: "Gagal menyimpan pengaturan" }, { status: 500 });
   }
 }

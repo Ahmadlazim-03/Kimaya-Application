@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const dept = searchParams.get("dept") || "";
     const loc = searchParams.get("loc") || "";
 
-    const where: Record<string, unknown> = { role: "EMPLOYEE" };
+    const where: Record<string, unknown> = { role: { in: ["THERAPIST", "DEVELOPER"] } };
     if (search) {
       where.OR = [
         { fullName: { contains: search, mode: "insensitive" } },
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         phone,
         departmentId: dept?.id,
         locationId: loc?.id,
-        role: "EMPLOYEE",
+        role: "THERAPIST",
         status: "ACTIVE",
       },
     });

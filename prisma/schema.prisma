@@ -16,10 +16,9 @@ datasource db {
 // ---- Enums ----
 
 enum UserRole {
-  SUPER_ADMIN
-  HR_ADMIN
-  MANAGER
-  EMPLOYEE
+  DEVELOPER
+  ADMIN
+  THERAPIST
 }
 
 enum UserStatus {
@@ -126,7 +125,7 @@ model User {
   fullName         String     @map("full_name") @db.VarChar(200)
   phone            String?    @db.VarChar(20)
   avatarUrl        String?    @map("avatar_url") @db.Text
-  role             UserRole   @default(EMPLOYEE)
+  role             UserRole   @default(THERAPIST)
   status           UserStatus @default(ACTIVE)
   joinDate         DateTime   @default(now()) @map("join_date") @db.Date
   probationEndDate DateTime?  @map("probation_end_date") @db.Date

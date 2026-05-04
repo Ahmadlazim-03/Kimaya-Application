@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ============================================
 -- ENUM Types
 -- ============================================
-CREATE TYPE user_role AS ENUM ('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'EMPLOYEE');
+CREATE TYPE user_role AS ENUM ('DEVELOPER', 'ADMIN', 'THERAPIST');
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'PROBATION', 'INACTIVE', 'TERMINATED');
 CREATE TYPE attendance_status AS ENUM ('ON_TIME', 'LATE', 'EARLY', 'HALF_DAY', 'ABSENT');
 CREATE TYPE leave_type AS ENUM ('ANNUAL', 'SICK', 'EMERGENCY', 'COMPANY', 'WFH');
@@ -53,7 +53,7 @@ CREATE TABLE users (
     full_name VARCHAR(200) NOT NULL,
     phone VARCHAR(20),
     avatar_url TEXT,
-    role user_role NOT NULL DEFAULT 'EMPLOYEE',
+    role user_role NOT NULL DEFAULT 'THERAPIST',
     status user_status NOT NULL DEFAULT 'ACTIVE',
     department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
     location_id UUID REFERENCES locations(id) ON DELETE SET NULL,
@@ -326,40 +326,40 @@ BEGIN
 
   -- Insert Admin
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('admin@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Admin HR', '+6281200000000', 'HR_ADMIN', 'ACTIVE', dept_hr, loc_gs, '2023-06-01')
+    VALUES ('admin@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Admin HR', '+6281200000000', 'ADMIN', 'ACTIVE', dept_hr, loc_gs, '2023-06-01')
   RETURNING id INTO uid_admin;
 
   -- Insert Employees
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('rina@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Rina Amelia', '+6281234567890', 'EMPLOYEE', 'ACTIVE', dept_spa, loc_aceh, '2024-01-15')
+    VALUES ('rina@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Rina Amelia', '+6281234567890', 'THERAPIST', 'ACTIVE', dept_spa, loc_aceh, '2024-01-15')
   RETURNING id INTO uid_rina;
 
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('dewi@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Dewi Kartika', '+6281345678901', 'EMPLOYEE', 'ACTIVE', dept_front, loc_sby, '2024-03-20')
+    VALUES ('dewi@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Dewi Kartika', '+6281345678901', 'THERAPIST', 'ACTIVE', dept_front, loc_sby, '2024-03-20')
   RETURNING id INTO uid_dewi;
 
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('siti@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Siti Nurhaliza', '+6281456789012', 'EMPLOYEE', 'ACTIVE', dept_beauty, loc_gs, '2024-06-01')
+    VALUES ('siti@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Siti Nurhaliza', '+6281456789012', 'THERAPIST', 'ACTIVE', dept_beauty, loc_gs, '2024-06-01')
   RETURNING id INTO uid_siti;
 
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('ahmad@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Ahmad Fauzi', '+6281567890123', 'EMPLOYEE', 'ACTIVE', dept_ops, loc_btn, '2024-02-10')
+    VALUES ('ahmad@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Ahmad Fauzi', '+6281567890123', 'THERAPIST', 'ACTIVE', dept_ops, loc_btn, '2024-02-10')
   RETURNING id INTO uid_ahmad;
 
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('farhan@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Farhan Malik', '+6281678901234', 'EMPLOYEE', 'ACTIVE', dept_ops, loc_sby, '2024-04-05')
+    VALUES ('farhan@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Farhan Malik', '+6281678901234', 'THERAPIST', 'ACTIVE', dept_ops, loc_sby, '2024-04-05')
   RETURNING id INTO uid_farhan;
 
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('budi@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Budi Santoso', '+6281789012345', 'EMPLOYEE', 'PROBATION', dept_mkt, loc_gs, '2026-04-01')
+    VALUES ('budi@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Budi Santoso', '+6281789012345', 'THERAPIST', 'PROBATION', dept_mkt, loc_gs, '2026-04-01')
   RETURNING id INTO uid_budi;
 
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('nadia@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Nadia Putri', '+6281890123456', 'EMPLOYEE', 'ACTIVE', dept_spa, loc_aceh, '2024-08-15')
+    VALUES ('nadia@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Nadia Putri', '+6281890123456', 'THERAPIST', 'ACTIVE', dept_spa, loc_aceh, '2024-08-15')
   RETURNING id INTO uid_nadia;
 
   INSERT INTO users (email, password_hash, full_name, phone, role, status, department_id, location_id, join_date)
-  VALUES ('rizky@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Rizky Pratama', '+6281901234567', 'EMPLOYEE', 'INACTIVE', dept_it, loc_gs, '2025-09-10')
+    VALUES ('rizky@kimayaexperience.com', crypt('kimaya123', gen_salt('bf')), 'Rizky Pratama', '+6281901234567', 'DEVELOPER', 'INACTIVE', dept_it, loc_gs, '2025-09-10')
   RETURNING id INTO uid_rizky;
 
   -- ============================================

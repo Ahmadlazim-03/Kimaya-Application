@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 export async function GET(request: Request) {
   try {
@@ -46,29 +47,50 @@ export async function GET(request: Request) {
   }
 }
 
+const DEFAULT_PASSWORD = "kimaya2026";
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { name, email, phone, departmentName, locationName } = body;
 
+    if (!name || !email) {
+      return NextResponse.json({ error: "Nama dan email wajib diisi" }, { status: 400 });
+    }
+
+    // Check if email already exists
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (existing) {
+      return NextResponse.json({ error: "Email sudah terdaftar" }, { status: 409 });
+    }
+
     const dept = departmentName ? await prisma.department.findFirst({ where: { name: departmentName } }) : null;
     const loc = locationName ? await prisma.location.findFirst({ where: { name: locationName } }) : null;
+
+    // Hash default password
+    const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
 
     const user = await prisma.user.create({
       data: {
         fullName: name,
-        email,
+        email: email.toLowerCase().trim(),
         phone,
         departmentId: dept?.id,
         locationId: loc?.id,
         role: "THERAPIST",
         status: "ACTIVE",
+        passwordHash,
+        onboardingCompleted: false,
       },
     });
 
-    return NextResponse.json({ id: user.id, message: "Karyawan berhasil ditambahkan" }, { status: 201 });
+    return NextResponse.json({ 
+      id: user.id, 
+      message: `Karyawan berhasil ditambahkan. Password default: ${DEFAULT_PASSWORD}` 
+    }, { status: 201 });
   } catch (error) {
     console.error("Create employee error:", error);
     return NextResponse.json({ error: "Gagal menambahkan karyawan" }, { status: 500 });
   }
 }
+

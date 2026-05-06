@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, Pencil, Trash2, Filter, ChevronDown, X as XIcon, UserPlus, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+
 interface Employee {
   id: string; name: string; email: string; phone: string; dept: string;
   location: string; status: string; joinDate: string; avatar: string;
@@ -32,6 +33,7 @@ export default function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
+
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -68,20 +70,31 @@ export default function EmployeesPage() {
     setSaving(true);
     const body = { name: formName, email: formEmail, phone: formPhone, departmentName: formDept, locationName: formLoc };
     if (editingEmployee) {
-      await fetch(`/api/employees/${editingEmployee.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      showToast("Karyawan berhasil diupdate");
+      const res = await fetch(`/api/employees/${editingEmployee.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) { showToast(`❌ ${data.error || "Gagal mengupdate"}`); setSaving(false); return; }
+      showToast("✅ Karyawan berhasil diupdate");
     } else {
-      await fetch("/api/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      showToast("Karyawan berhasil ditambahkan");
+      const res = await fetch("/api/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) { showToast(`❌ ${data.error || "Gagal menambahkan"}`); setSaving(false); return; }
+      showToast(`✅ ${data.message || "Karyawan berhasil ditambahkan"}`);
+      setSearch(""); // Clear search so new employee is visible
     }
     setSaving(false); setShowModal(false); fetchEmployees();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Yakin ingin menonaktifkan karyawan ini?")) return;
-    await fetch(`/api/employees/${id}`, { method: "DELETE" });
-    showToast("Karyawan berhasil dinonaktifkan");
-    fetchEmployees();
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Yakin ingin menonaktifkan "${name}"?`)) return;
+    try {
+      const res = await fetch(`/api/employees/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) { showToast(`❌ ${data.error || "Gagal menghapus"}`); return; }
+      showToast("✅ Karyawan berhasil dinonaktifkan");
+      fetchEmployees();
+    } catch {
+      showToast("❌ Tidak dapat terhubung ke server");
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-kimaya-olive" /></div>;
@@ -163,7 +176,7 @@ export default function EmployeesPage() {
                           className="w-8 h-8 rounded-lg hover:bg-kimaya-cream flex items-center justify-center text-kimaya-brown-light/40 hover:text-kimaya-olive transition-colors">
                           <Pencil size={14} />
                         </motion.button>
-                        <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleDelete(emp.id)}
+                        <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleDelete(emp.id, emp.name)}
                           className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-kimaya-brown-light/40 hover:text-red-500 transition-colors">
                           <Trash2 size={14} />
                         </motion.button>
@@ -224,6 +237,13 @@ export default function EmployeesPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Info: password & onboarding */}
+                <div className="bg-kimaya-olive/5 border border-kimaya-olive/20 rounded-xl p-3 text-xs text-kimaya-brown-light/70">
+                  <p>💡 Password default: <span className="font-semibold text-kimaya-brown">kimaya2026</span></p>
+                  <p className="mt-1">📸 Verifikasi wajah & profil dilengkapi oleh karyawan saat login pertama kali.</p>
+                </div>
+
                 <motion.button whileTap={{ scale: 0.98 }} onClick={handleSubmit} disabled={saving || !formName || !formEmail}
                   className="w-full py-3.5 rounded-xl bg-kimaya-olive text-white font-medium text-sm hover:bg-kimaya-olive-dark transition-all shadow-lg shadow-kimaya-olive/20 mt-2 disabled:opacity-50 flex items-center justify-center gap-2">
                   {saving ? <Loader2 size={16} className="animate-spin" /> : null}

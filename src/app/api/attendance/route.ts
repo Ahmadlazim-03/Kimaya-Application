@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Cuti disetujui" });
     }
 
-    const { userId, action, latitude, longitude } = body;
+    const { userId, action, latitude, longitude, selfiePhoto } = body;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const now = new Date();
 
@@ -113,11 +113,13 @@ export async function POST(request: Request) {
           userId, date: today, checkInTime: now, status,
           checkInLat: latitude || null, checkInLng: longitude || null,
           checkInMethod: latitude ? "GPS" : "WEB",
+          checkInSelfie: selfiePhoto || null,
         },
         update: {
           checkInTime: now, status,
           checkInLat: latitude || null, checkInLng: longitude || null,
           checkInMethod: latitude ? "GPS" : "WEB",
+          checkInSelfie: selfiePhoto || null,
         },
       });
       return NextResponse.json({

@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createSession, setSessionCookie } from "@/lib/auth";
-import { createHash } from "crypto";
-
-function hashPassword(password: string): string {
-  return createHash("sha256").update(password).digest("hex");
-}
+import bcrypt from "bcryptjs";
 
 export async function POST(request: Request) {
   try {
@@ -28,24 +24,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Akun Anda tidak aktif. Hubungi HR." }, { status: 403 });
     }
 
-    // Verify password
-    const hashed = hashPassword(password);
-    if (user.passwordHash && user.passwordHash !== hashed) {
+    // Must have a password set (no more first-login auto-set)
+    if (!user.passwordHash) {
+      return NextResponse.json({ error: "Akun belum memiliki password. Silakan hubungi Admin." }, { status: 401 });
+    }
+
+    // Verify password with bcrypt
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
       return NextResponse.json({ error: "Password salah" }, { status: 401 });
     }
 
-    // If no password hash set yet (first-time/seed users), accept and set it
-    if (!user.passwordHash) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: hashed, lastLoginAt: new Date() },
-      });
-    } else {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date() },
-      });
-    }
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     const sessionUser = {
       id: user.id,
@@ -55,6 +49,7 @@ export async function POST(request: Request) {
       departmentId: user.departmentId || undefined,
       locationId: user.locationId || undefined,
       avatarUrl: user.avatarUrl || undefined,
+      facePhotoUrl: user.facePhotoUrl || undefined,
     };
 
     const token = await createSession(sessionUser);

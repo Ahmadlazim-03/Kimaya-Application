@@ -13,13 +13,19 @@ export interface AuthUser {
   departmentId?: string;
   locationId?: string;
   avatarUrl?: string;
+  facePhotoUrl?: string;
+  phone?: string;
+  address?: string;
+  onboardingCompleted?: boolean;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
+  needsOnboarding: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   isDeveloper: boolean;
   isAdmin: boolean;
   isTherapist: boolean;
@@ -42,6 +48,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -51,9 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+        setNeedsOnboarding(data.needsOnboarding || false);
       } else {
         setUser(null);
-        if (pathname?.startsWith("/dashboard")) {
+        setNeedsOnboarding(false);
+        if (pathname?.startsWith("/dashboard") || pathname?.startsWith("/onboarding")) {
           router.replace("/login");
         }
       }
@@ -68,11 +77,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchUser();
   }, [fetchUser]);
 
-  // Guard: redirect if no access
+  // Guard: redirect to onboarding if needed
   useEffect(() => {
     if (loading || !user) return;
-    if (!pathname?.startsWith("/dashboard")) return;
 
+    // If onboarding not completed and user is on dashboard, redirect to onboarding
+    if (needsOnboarding && pathname?.startsWith("/dashboard")) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    // If onboarding completed and user is on onboarding page, redirect to dashboard
+    if (!needsOnboarding && pathname === "/onboarding") {
+      router.replace("/dashboard");
+      return;
+    }
+
+    // Role-based access guard
+    if (!pathname?.startsWith("/dashboard")) return;
     const matchedPath = Object.keys(ROLE_PAGES)
       .filter((p) => pathname === p || pathname.startsWith(p + "/"))
       .sort((a, b) => b.length - a.length)[0];
@@ -80,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (matchedPath && !ROLE_PAGES[matchedPath].includes(user.role)) {
       router.replace("/dashboard");
     }
-  }, [user, loading, pathname, router]);
+  }, [user, loading, pathname, router, needsOnboarding]);
 
   const login = async (email: string, password: string) => {
     const res = await fetch("/api/auth/login", {
@@ -99,7 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
+    setNeedsOnboarding(false);
     router.replace("/login");
+  };
+
+  const refreshUser = async () => {
+    await fetchUser();
   };
 
   const canAccess = (path: string): boolean => {
@@ -116,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isTherapist = user?.role === "THERAPIST";
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isDeveloper, isAdmin, isTherapist, canAccess }}>
+    <AuthContext.Provider value={{ user, loading, needsOnboarding, login, logout, refreshUser, isDeveloper, isAdmin, isTherapist, canAccess }}>
       {children}
     </AuthContext.Provider>
   );

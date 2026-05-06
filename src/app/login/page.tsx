@@ -25,7 +25,14 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        router.push("/dashboard");
+        // Check if user needs onboarding (first login)
+        const meRes = await fetch("/api/auth/me");
+        const meData = await meRes.json();
+        if (meData.needsOnboarding) {
+          router.push("/onboarding");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         setError(data.error || "Login gagal");
       }
@@ -34,13 +41,6 @@ export default function LoginPage() {
     }
     setLoading(false);
   };
-
-  // Quick login cards for demo
-  const demoAccounts = [
-    { label: "Developer (IT)", email: "rizky@kimayaexperience.com", role: "DEVELOPER", color: "bg-blue-500" },
-    { label: "Admin", email: "admin@kimayaexperience.com", role: "ADMIN", color: "bg-kimaya-olive" },
-    { label: "Rina (Therapist)", email: "rina@kimayaexperience.com", role: "THERAPIST", color: "bg-purple-500" },
-  ];
 
   return (
     <div className="min-h-screen flex">
@@ -66,8 +66,8 @@ export default function LoginPage() {
           <div className="flex items-center gap-3 mb-2">
             <div className="w-12 h-12 rounded-full bg-kimaya-gold/20 flex items-center justify-center">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C8 6 4 10 4 14C4 18.4183 7.58172 22 12 22C16.4183 22 20 18.4183 20 14C20 10 16 6 12 2Z" stroke="#C5A059" strokeWidth="1.5" fill="none"/>
-                <path d="M12 8C10 11 8 13 8 15C8 17.2091 9.79086 19 12 19C14.2091 19 16 17.2091 16 15C16 13 14 11 12 8Z" fill="#C5A059" opacity="0.3"/>
+                <path d="M12 2C8 6 4 10 4 14C4 18.4183 7.58172 22 12 22C16.4183 22 20 18.4183 20 14C20 10 16 6 12 2Z" stroke="#C5A059" strokeWidth="1.5" fill="none" />
+                <path d="M12 8C10 11 8 13 8 15C8 17.2091 9.79086 19 12 19C14.2091 19 16 17.2091 16 15C16 13 14 11 12 8Z" fill="#C5A059" opacity="0.3" />
               </svg>
             </div>
             <div>
@@ -118,7 +118,7 @@ export default function LoginPage() {
           <div className="lg:hidden flex items-center gap-3 mb-10 justify-center">
             <div className="w-10 h-10 rounded-full bg-kimaya-olive/10 flex items-center justify-center">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2C8 6 4 10 4 14C4 18.4183 7.58172 22 12 22C16.4183 22 20 18.4183 20 14C20 10 16 6 12 2Z" stroke="#5B633D" strokeWidth="1.5"/>
+                <path d="M12 2C8 6 4 10 4 14C4 18.4183 7.58172 22 12 22C16.4183 22 20 18.4183 20 14C20 10 16 6 12 2Z" stroke="#5B633D" strokeWidth="1.5" />
               </svg>
             </div>
             <div>
@@ -137,32 +137,11 @@ export default function LoginPage() {
           {error && (
             <div className="mb-5 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 flex items-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
               </svg>
               {error}
             </div>
           )}
-
-          {/* Quick Login Cards */}
-          <div className="mb-6">
-            <p className="text-[10px] font-semibold text-kimaya-brown-light/40 uppercase tracking-[0.15em] mb-3">Quick Login (Demo)</p>
-            <div className="grid grid-cols-3 gap-2">
-              {demoAccounts.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => { setEmail(acc.email); setPassword("kimaya2026"); setError(""); }}
-                  className="p-3 rounded-xl border border-kimaya-cream-dark/30 bg-white hover:bg-kimaya-cream/30 transition-all text-center group"
-                >
-                  <div className={`w-8 h-8 rounded-full ${acc.color} flex items-center justify-center text-white text-[10px] font-semibold mx-auto mb-1.5`}>
-                    {acc.label.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-                  </div>
-                  <p className="text-[11px] font-medium text-kimaya-brown truncate">{acc.label}</p>
-                  <p className="text-[9px] text-kimaya-brown-light/40 mt-0.5">{acc.role}</p>
-                </button>
-              ))}
-            </div>
-          </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Email */}
@@ -176,7 +155,7 @@ export default function LoginPage() {
                 </div>
                 <input
                   id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@kimayaexperience.com" required
+                  placeholder="nama@email.com" required
                   className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-kimaya-cream-dark bg-kimaya-white text-kimaya-brown placeholder-kimaya-brown-light/40 text-sm focus:outline-none focus:ring-2 focus:ring-kimaya-olive/30 focus:border-kimaya-olive transition-all"
                 />
               </div>
@@ -218,7 +197,6 @@ export default function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 rounded border-kimaya-cream-dark text-kimaya-olive focus:ring-kimaya-olive/30" />
                 <span className="text-sm text-kimaya-brown-light/70">Ingat saya</span>
               </label>
-              <a href="#" className="text-sm text-kimaya-olive hover:text-kimaya-olive-dark font-medium transition-colors">Lupa kata sandi?</a>
             </div>
 
             {/* Submit */}
@@ -236,25 +214,13 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Role Info */}
-          <div className="mt-8 p-4 rounded-xl bg-kimaya-cream/50 border border-kimaya-cream-dark/20">
-            <p className="text-[10px] font-semibold text-kimaya-brown-light/40 uppercase tracking-[0.15em] mb-2">Role & Hak Akses</p>
-            <div className="space-y-1.5">
-              {[
-                { role: "Developer (IT)", desc: "Akses penuh semua menu + konfigurasi sistem" },
-                { role: "Admin", desc: "Monitoring, skoring, reminder, kelola karyawan (tanpa absen)" },
-                { role: "Therapist", desc: "Absensi, upload laporan, lihat skor pribadi" },
-              ].map((r) => (
-                <div key={r.role} className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-kimaya-olive mt-1.5 flex-shrink-0" />
-                  <div>
-                    <span className="text-xs font-medium text-kimaya-brown">{r.role}</span>
-                    <span className="text-xs text-kimaya-brown-light/40"> — {r.desc}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-xs text-kimaya-brown-light/40">
+              Hubungi admin untuk pembuatan akun baru
+            </p>
           </div>
+
         </div>
       </div>
     </div>

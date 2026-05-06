@@ -1,6 +1,8 @@
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
+const DEFAULT_PASSWORD = "kimaya2026";
 
 async function main() {
   // Check if already seeded
@@ -50,8 +52,12 @@ async function main() {
   });
 
   // Users
+  // Hash default password for all seed users
+  const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 12);
+  console.log(`🔑 Default password for all seed users: ${DEFAULT_PASSWORD}`);
+
   const admin = await prisma.user.create({
-    data: { email: "admin@kimayaexperience.com", fullName: "Admin HR", phone: "+6281200000000", role: "ADMIN", status: "ACTIVE", departmentId: depts["HR & Admin"].id, locationId: locs["Kimaya Spa Gading Serpong"].id },
+    data: { email: "admin@kimayaexperience.com", fullName: "Admin HR", phone: "+6281200000000", role: "ADMIN", status: "ACTIVE", departmentId: depts["HR & Admin"].id, locationId: locs["Kimaya Spa Gading Serpong"].id, passwordHash: hashedPassword, onboardingCompleted: true },
   });
 
   const usersData = [
@@ -67,7 +73,7 @@ async function main() {
   const users = {};
   for (const u of usersData) {
     users[u.fullName] = await prisma.user.create({
-      data: { email: u.email, fullName: u.fullName, phone: u.phone, role: u.role, status: u.status, departmentId: depts[u.dept].id, locationId: locs[u.loc].id },
+      data: { email: u.email, fullName: u.fullName, phone: u.phone, role: u.role, status: u.status, departmentId: depts[u.dept].id, locationId: locs[u.loc].id, passwordHash: hashedPassword, onboardingCompleted: u.role !== "THERAPIST" },
     });
   }
 

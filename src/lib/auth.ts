@@ -19,6 +19,7 @@ export interface SessionUser {
   departmentId?: string;
   locationId?: string;
   avatarUrl?: string;
+  facePhotoUrl?: string;
 }
 
 // ---- RBAC Permissions ----
@@ -114,6 +115,7 @@ export async function getSession(): Promise<SessionUser | null> {
       departmentId: payload.departmentId as string | undefined,
       locationId: payload.locationId as string | undefined,
       avatarUrl: payload.avatarUrl as string | undefined,
+      facePhotoUrl: payload.facePhotoUrl as string | undefined,
     };
   } catch {
     return null;

@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, MapPin, Users, UserX, AlertTriangle, Calendar, Loader2, Check, Navigation, Shield, ShieldCheck, ShieldAlert, CalendarDays } from "lucide-react";
+import { Clock, MapPin, Users, UserX, AlertTriangle, Calendar, Loader2, Check, Navigation, Shield, ShieldCheck, ShieldAlert, CalendarDays, ScanFace } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
+import dynamic from "next/dynamic";
+
+const FaceDetector = dynamic(() => import("@/app/components/FaceDetector"), { ssr: false });
 
 interface AttRecord { id: string; name: string; dept: string; checkIn: string; checkOut: string; status: string; method: string; gpsVerified: boolean; avatar: string; }
 interface LeaveRec { id: string; name: string; type: string; from: string; to: string; status: string; avatar: string; }
@@ -36,6 +39,12 @@ export default function AttendancePage() {
   const [gpsStatus, setGpsStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsResult, setGpsResult] = useState<{ distance: number; gpsValid: boolean; gpsRadius: number } | null>(null);
+  const [showFaceCapture, setShowFaceCapture] = useState(false);
+  const [selfiePhoto, setSelfiePhoto] = useState<string | null>(null);
+  const [faceVerified, setFaceVerified] = useState(false);
+  const [faceMatchScore, setFaceMatchScore] = useState<number | null>(null);
+  const [faceChecking, setFaceChecking] = useState(false);
+  const [stampingPhoto, setStampingPhoto] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 4000); };
 
@@ -65,20 +74,62 @@ export default function AttendancePage() {
     setCheckingIn(true);
     try {
       const coords = await getLocation();
-      // For demo, use first employee if no userId provided
       const targetUserId = userId || (records.length > 0 ? records[0].id : "");
+
+      // Stamp the selfie photo with date/time/address
+      let finalPhoto = selfiePhoto || undefined;
+      if (selfiePhoto) {
+        setStampingPhoto(true);
+        try {
+          const { reverseGeocode, stampPhoto } = await import("@/lib/photoStamp");
+          const addressLines = await reverseGeocode(coords.lat, coords.lng);
+          finalPhoto = await stampPhoto({
+            photoBase64: selfiePhoto,
+            dateTime: new Date(),
+            addressLines,
+            userName: user?.fullName,
+          });
+        } catch (err) {
+          console.error("Stamp photo error:", err);
+          // Fallback: use original photo without stamp
+        }
+        setStampingPhoto(false);
+      }
+
       const res = await fetch("/api/attendance", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: targetUserId, action: "checkin", latitude: coords.lat, longitude: coords.lng }),
+        body: JSON.stringify({
+          userId: targetUserId, action: "checkin",
+          latitude: coords.lat, longitude: coords.lng,
+          selfiePhoto: finalPhoto,
+        }),
       });
       const data = await res.json();
       setGpsResult({ distance: data.distance, gpsValid: data.gpsValid, gpsRadius: data.gpsRadius });
       showToast(data.message);
       fetchData();
+      // Reset face verification state
+      setSelfiePhoto(null);
+      setFaceVerified(false);
+      setFaceMatchScore(null);
     } catch (err) {
       showToast("⚠️ Gagal mendapatkan lokasi GPS. Pastikan GPS aktif.");
     }
     setCheckingIn(false);
+  };
+
+  const handleFaceVerified = async (photo: string) => {
+    setSelfiePhoto(photo);
+    setShowFaceCapture(false);
+    // Face comparison already done inside FaceDetector — photo only arrives if match
+    setFaceVerified(true);
+    setFaceChecking(false);
+    showToast("✅ Wajah terverifikasi! Memulai GPS check-in...");
+
+    // Auto-trigger check-in after face is verified
+    setTimeout(() => {
+      handleCheckIn();
+    }, 500);
   };
 
   const handleApproveLeave = async (id: string) => {
@@ -100,6 +151,7 @@ export default function AttendancePage() {
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-kimaya-olive" /></div>;
 
   return (
+    <>
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1400px] mx-auto">
       <AnimatePresence>
         {toast && (
@@ -136,9 +188,10 @@ export default function AttendancePage() {
               <Navigation size={24} className="text-kimaya-olive" />
             </div>
             <div>
-              <h3 className="text-lg font-serif text-kimaya-brown">Check-in dengan GPS</h3>
+              <h3 className="text-lg font-serif text-kimaya-brown">Check-in dengan GPS + Face</h3>
               <p className="text-sm text-kimaya-brown-light/60 mt-0.5">
-                {gpsStatus === "idle" && "Klik tombol untuk absen dengan validasi lokasi"}
+                {gpsStatus === "idle" && !faceVerified && "Langkah 1: Verifikasi wajah terlebih dahulu"}
+                {gpsStatus === "idle" && faceVerified && "Wajah ✓ — Klik GPS Check-in untuk absen"}
                 {gpsStatus === "loading" && "📡 Mendapatkan lokasi GPS..."}
                 {gpsStatus === "success" && gpsCoords && `📍 Lat: ${gpsCoords.lat.toFixed(6)}, Lng: ${gpsCoords.lng.toFixed(6)}`}
                 {gpsStatus === "error" && "❌ GPS gagal. Aktifkan izin lokasi di browser."}
@@ -151,13 +204,48 @@ export default function AttendancePage() {
                   }
                 </div>
               )}
+              {/* Face verification badge */}
+              {faceChecking && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs text-blue-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Membandingkan wajah...</span>
+                </div>
+              )}
+              {faceVerified && faceMatchScore !== null && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs text-kimaya-olive flex items-center gap-1"><ScanFace size={12} /> Wajah cocok ({faceMatchScore}%)</span>
+                </div>
+              )}
+              {!faceVerified && faceMatchScore !== null && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12} /> Wajah tidak cocok ({faceMatchScore}%)</span>
+                </div>
+              )}
+              {faceVerified && faceMatchScore === null && selfiePhoto && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs text-kimaya-olive flex items-center gap-1"><ScanFace size={12} /> Wajah terverifikasi</span>
+                </div>
+              )}
             </div>
           </div>
-          <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleCheckIn()} disabled={checkingIn}
-            className="px-6 py-3 rounded-xl bg-kimaya-olive text-white text-sm font-medium hover:bg-kimaya-olive-dark transition-all shadow-lg shadow-kimaya-olive/20 flex items-center gap-2 disabled:opacity-50">
-            {checkingIn ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-            Check-in GPS
-          </motion.button>
+          <div className="flex items-center gap-2">
+            {/* Face Verify Button */}
+            <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowFaceCapture(true)}
+              className={cn(
+                "px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 transition-all",
+                faceVerified
+                  ? "bg-green-50 text-green-600 border border-green-200"
+                  : "bg-white text-kimaya-olive border border-kimaya-olive/30 hover:bg-kimaya-olive/5"
+              )}>
+              <ScanFace size={16} />
+              {faceVerified ? "Wajah ✓" : "Verifikasi Wajah"}
+            </motion.button>
+            {/* GPS Check-in Button */}
+            <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleCheckIn()} disabled={checkingIn || !faceVerified || stampingPhoto}
+              className="px-6 py-3 rounded-xl bg-kimaya-olive text-white text-sm font-medium hover:bg-kimaya-olive-dark transition-all shadow-lg shadow-kimaya-olive/20 flex items-center gap-2 disabled:opacity-50">
+              {checkingIn || stampingPhoto ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
+              {stampingPhoto ? "Memproses foto..." : checkingIn ? "Check-in..." : "Check-in GPS"}
+            </motion.button>
+          </div>
         </div>
       </motion.div>
       )}
@@ -248,5 +336,19 @@ export default function AttendancePage() {
         </motion.div>
       </div>
     </motion.div>
+
+    {/* Face Detector Modal for Attendance */}
+    <AnimatePresence>
+      {showFaceCapture && (
+        <FaceDetector
+          mode="attendance"
+          registeredFaceUrl={user?.facePhotoUrl}
+          onCapture={handleFaceVerified}
+          onClose={() => setShowFaceCapture(false)}
+          autoCaptureDelay={1500}
+        />
+      )}
+    </AnimatePresence>
+    </>
   );
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { verifyFaceToken } from "@/lib/faceVerifyToken";
 
 export async function GET(request: Request) {
   try {
@@ -70,15 +72,57 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Handle leave approval
+    // Handle leave approval (no face check needed)
     if (body.leaveId && body.action === "approve") {
       await prisma.leaveRequest.update({ where: { id: body.leaveId }, data: { status: "APPROVED", approvedAt: new Date() } });
       return NextResponse.json({ message: "Cuti disetujui" });
     }
 
-    const { userId, action, latitude, longitude, selfiePhoto } = body;
+    // ── Authentication ──
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Tidak terautentikasi" }, { status: 401 });
+    }
+
+    const { action, latitude, longitude, selfiePhoto, faceVerifyToken } = body;
+    const userId = session.id; // Use session user ID, not from body (prevent spoofing)
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const now = new Date();
+
+    // ── Face verification for check-in (non-ADMIN only) ──
+    let faceMatchScore: number | null = null;
+    if (action === "checkin" && session.role !== "ADMIN") {
+      // Validate user has registered face
+      const userFace = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { facePhotoUrl: true, onboardingCompleted: true },
+      });
+
+      if (!userFace?.facePhotoUrl) {
+        return NextResponse.json(
+          { error: "Anda belum mendaftarkan foto wajah. Selesaikan onboarding terlebih dahulu." },
+          { status: 403 }
+        );
+      }
+
+      // Validate face verification token
+      if (!faceVerifyToken) {
+        return NextResponse.json(
+          { error: "Token verifikasi wajah diperlukan. Lakukan scan wajah terlebih dahulu." },
+          { status: 403 }
+        );
+      }
+
+      const tokenData = await verifyFaceToken(faceVerifyToken, userId, selfiePhoto);
+      if (!tokenData) {
+        return NextResponse.json(
+          { error: "Token verifikasi wajah tidak valid atau sudah kedaluwarsa. Scan wajah ulang." },
+          { status: 403 }
+        );
+      }
+
+      faceMatchScore = tokenData.matchScore;
+    }
 
     // Get user's assigned location for GPS validation
     const user = await prisma.user.findUnique({
@@ -112,25 +156,44 @@ export async function POST(request: Request) {
         create: {
           userId, date: today, checkInTime: now, status,
           checkInLat: latitude || null, checkInLng: longitude || null,
-          checkInMethod: latitude ? "GPS" : "WEB",
+          checkInMethod: latitude ? "GPS_FACE" : "WEB_FACE",
           checkInSelfie: selfiePhoto || null,
         },
         update: {
           checkInTime: now, status,
           checkInLat: latitude || null, checkInLng: longitude || null,
-          checkInMethod: latitude ? "GPS" : "WEB",
+          checkInMethod: latitude ? "GPS_FACE" : "WEB_FACE",
           checkInSelfie: selfiePhoto || null,
         },
       });
+
+      // ── Audit log with face match score ──
+      await prisma.auditLog.create({
+        data: {
+          userId,
+          action: "CHECK_IN",
+          entityType: "Attendance",
+          entityId: att.id,
+          details: {
+            status: att.status,
+            faceMatchScore,
+            gpsValid,
+            distance: Math.round(distance),
+            method: latitude ? "GPS_FACE" : "WEB_FACE",
+            checkInTime: now.toISOString(),
+          },
+        },
+      });
+
       return NextResponse.json({
         id: att.id, status: att.status,
         gpsValid, distance: Math.round(distance),
-        gpsRadius,
+        gpsRadius, faceMatchScore,
         message: gpsValid
-          ? `✅ Check-in berhasil! GPS terverifikasi (${Math.round(distance)}m dari kantor)`
+          ? `✅ Check-in berhasil! Wajah ✓ (${faceMatchScore || '-'}%) • GPS ✓ (${Math.round(distance)}m)`
           : latitude
-            ? `⚠️ Check-in berhasil, tapi GPS di luar radius (${Math.round(distance)}m / max ${gpsRadius}m)`
-            : `✅ Check-in berhasil (tanpa GPS)`,
+            ? `⚠️ Check-in berhasil! Wajah ✓ • GPS di luar radius (${Math.round(distance)}m / max ${gpsRadius}m)`
+            : `✅ Check-in berhasil! Wajah ✓ (${faceMatchScore || '-'}%)`,
       });
     } else {
       const att = await prisma.attendance.update({

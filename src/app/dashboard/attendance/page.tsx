@@ -45,6 +45,7 @@ export default function AttendancePage() {
   const [faceMatchScore, setFaceMatchScore] = useState<number | null>(null);
   const [faceChecking, setFaceChecking] = useState(false);
   const [stampingPhoto, setStampingPhoto] = useState(false);
+  const [faceVerifyToken, setFaceVerifyToken] = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 4000); };
 
@@ -102,34 +103,76 @@ export default function AttendancePage() {
           userId: targetUserId, action: "checkin",
           latitude: coords.lat, longitude: coords.lng,
           selfiePhoto: finalPhoto,
+          faceVerifyToken: faceVerifyToken, // Send server-signed face verification token
         }),
       });
       const data = await res.json();
-      setGpsResult({ distance: data.distance, gpsValid: data.gpsValid, gpsRadius: data.gpsRadius });
-      showToast(data.message);
-      fetchData();
-      // Reset face verification state
-      setSelfiePhoto(null);
-      setFaceVerified(false);
-      setFaceMatchScore(null);
-    } catch (err) {
+
+      if (!res.ok) {
+        showToast(`❌ ${data.error || "Gagal check-in"}`);
+        // Reset face verification if token expired
+        if (res.status === 403) {
+          setSelfiePhoto(null);
+          setFaceVerified(false);
+          setFaceMatchScore(null);
+          setFaceVerifyToken(null);
+        }
+      } else {
+        setGpsResult({ distance: data.distance, gpsValid: data.gpsValid, gpsRadius: data.gpsRadius });
+        showToast(data.message);
+        fetchData();
+        // Reset face verification state
+        setSelfiePhoto(null);
+        setFaceVerified(false);
+        setFaceMatchScore(null);
+        setFaceVerifyToken(null);
+      }
+    } catch {
       showToast("⚠️ Gagal mendapatkan lokasi GPS. Pastikan GPS aktif.");
     }
     setCheckingIn(false);
   };
 
-  const handleFaceVerified = async (photo: string) => {
+  const handleFaceVerified = async (photo: string, matchScore?: number) => {
     setSelfiePhoto(photo);
     setShowFaceCapture(false);
-    // Face comparison already done inside FaceDetector — photo only arrives if match
-    setFaceVerified(true);
-    setFaceChecking(false);
-    showToast("✅ Wajah terverifikasi! Memulai GPS check-in...");
+    setFaceChecking(true);
 
-    // Auto-trigger check-in after face is verified
-    setTimeout(() => {
-      handleCheckIn();
-    }, 500);
+    const score = matchScore || 85; // Use actual score from FaceDetector
+
+    try {
+      // Call server-side verify-face API to get signed token
+      const res = await fetch("/api/attendance/verify-face", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selfiePhoto: photo,
+          matchScore: score,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.token) {
+        setFaceVerifyToken(data.token);
+        setFaceVerified(true);
+        setFaceMatchScore(data.matchScore);
+        setFaceChecking(false);
+        showToast(`✅ Wajah terverifikasi (${data.matchScore}%)! Memulai GPS check-in...`);
+
+        // Auto-trigger check-in after face is verified
+        setTimeout(() => {
+          handleCheckIn();
+        }, 500);
+      } else {
+        setFaceChecking(false);
+        setFaceVerified(false);
+        showToast(`❌ ${data.error || "Gagal verifikasi wajah di server"}`);
+      }
+    } catch {
+      setFaceChecking(false);
+      setFaceVerified(false);
+      showToast("❌ Gagal menghubungi server untuk verifikasi wajah");
+    }
   };
 
   const handleApproveLeave = async (id: string) => {
@@ -152,203 +195,204 @@ export default function AttendancePage() {
 
   return (
     <>
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1400px] mx-auto">
-      <AnimatePresence>
-        {toast && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-            className="fixed top-6 right-6 z-[60] bg-kimaya-olive text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm max-w-sm">
-            <Check size={16} /> {toast}
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 max-w-[1400px] mx-auto">
+        <AnimatePresence>
+          {toast && (
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+              className="fixed top-6 right-6 z-[60] bg-kimaya-olive text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm max-w-sm">
+              <Check size={16} /> {toast}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-serif text-kimaya-brown">Absensi</h1>
+            <p className="text-sm text-kimaya-brown-light/60 mt-1">Kehadiran {stats.present} dari {stats.total} karyawan</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/attendance/calendar"
+              className="px-4 py-2.5 rounded-xl bg-kimaya-olive text-white text-sm font-medium hover:bg-kimaya-olive-dark transition-all shadow-lg shadow-kimaya-olive/20 flex items-center gap-2">
+              <CalendarDays size={14} /> Kalender Monitoring
+            </Link>
+            <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 border border-kimaya-cream-dark/30">
+              <Calendar size={14} className="text-kimaya-brown-light/40" />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent text-sm text-kimaya-brown outline-none" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* GPS Check-in Card — hidden for ADMIN (admin tidak absen) */}
+        {user?.role !== "ADMIN" && (
+          <motion.div variants={item} className="bg-gradient-to-r from-kimaya-olive/10 to-kimaya-cream rounded-2xl p-6 border border-kimaya-olive/20">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center shadow-sm">
+                  <Navigation size={24} className="text-kimaya-olive" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-serif text-kimaya-brown">Check-in dengan GPS + Face</h3>
+                  <p className="text-sm text-kimaya-brown-light/60 mt-0.5">
+                    {gpsStatus === "idle" && !faceVerified && "Langkah 1: Verifikasi wajah terlebih dahulu"}
+                    {gpsStatus === "idle" && faceVerified && "Wajah ✓ — Klik GPS Check-in untuk absen"}
+                    {gpsStatus === "loading" && "📡 Mendapatkan lokasi GPS..."}
+                    {gpsStatus === "success" && gpsCoords && `📍 Lat: ${gpsCoords.lat.toFixed(6)}, Lng: ${gpsCoords.lng.toFixed(6)}`}
+                    {gpsStatus === "error" && "❌ GPS gagal. Aktifkan izin lokasi di browser."}
+                  </p>
+                  {gpsResult && (
+                    <div className="flex items-center gap-2 mt-1">
+                      {gpsResult.gpsValid
+                        ? <span className="text-xs text-kimaya-olive flex items-center gap-1"><ShieldCheck size={12} /> Lokasi terverifikasi ({gpsResult.distance}m)</span>
+                        : <span className="text-xs text-amber-600 flex items-center gap-1"><ShieldAlert size={12} /> Di luar radius ({gpsResult.distance}m / max {gpsResult.gpsRadius}m)</span>
+                      }
+                    </div>
+                  )}
+                  {/* Face verification badge */}
+                  {faceChecking && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-blue-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Membandingkan wajah...</span>
+                    </div>
+                  )}
+                  {faceVerified && faceMatchScore !== null && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-kimaya-olive flex items-center gap-1"><ScanFace size={12} /> Wajah cocok ({faceMatchScore}%)</span>
+                    </div>
+                  )}
+                  {!faceVerified && faceMatchScore !== null && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12} /> Wajah tidak cocok ({faceMatchScore}%)</span>
+                    </div>
+                  )}
+                  {faceVerified && faceMatchScore === null && selfiePhoto && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-kimaya-olive flex items-center gap-1"><ScanFace size={12} /> Wajah terverifikasi</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Face Verify Button */}
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowFaceCapture(true)}
+                  className={cn(
+                    "px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 transition-all",
+                    faceVerified
+                      ? "bg-green-50 text-green-600 border border-green-200"
+                      : "bg-white text-kimaya-olive border border-kimaya-olive/30 hover:bg-kimaya-olive/5"
+                  )}>
+                  <ScanFace size={16} />
+                  {faceVerified ? "Wajah ✓" : "Verifikasi Wajah"}
+                </motion.button>
+                {/* GPS Check-in Button */}
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleCheckIn()} disabled={checkingIn || !faceVerified || stampingPhoto}
+                  className="px-6 py-3 rounded-xl bg-kimaya-olive text-white text-sm font-medium hover:bg-kimaya-olive-dark transition-all shadow-lg shadow-kimaya-olive/20 flex items-center gap-2 disabled:opacity-50">
+                  {checkingIn || stampingPhoto ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
+                  {stampingPhoto ? "Memproses foto..." : checkingIn ? "Check-in..." : "Check-in GPS"}
+                </motion.button>
+              </div>
+            </div>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      <motion.div variants={item} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-serif text-kimaya-brown">Absensi</h1>
-          <p className="text-sm text-kimaya-brown-light/60 mt-1">Kehadiran {stats.present} dari {stats.total} karyawan</p>
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {statCards.map(s => {
+            const Icon = s.icon; return (
+              <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-5 border border-kimaya-cream-dark/30">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-3", s.cls)}><Icon size={18} /></div>
+                <p className="text-2xl font-semibold text-kimaya-brown">{s.value}</p>
+                <p className="text-xs text-kimaya-brown-light/50 mt-0.5">{s.label}</p>
+              </motion.div>
+            );
+          })}
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/attendance/calendar"
-            className="px-4 py-2.5 rounded-xl bg-kimaya-olive text-white text-sm font-medium hover:bg-kimaya-olive-dark transition-all shadow-lg shadow-kimaya-olive/20 flex items-center gap-2">
-            <CalendarDays size={14} /> Kalender Monitoring
-          </Link>
-          <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 border border-kimaya-cream-dark/30">
-            <Calendar size={14} className="text-kimaya-brown-light/40" />
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent text-sm text-kimaya-brown outline-none" />
-          </div>
-        </div>
-      </motion.div>
 
-      {/* GPS Check-in Card — hidden for ADMIN (admin tidak absen) */}
-      {user?.role !== "ADMIN" && (
-      <motion.div variants={item} className="bg-gradient-to-r from-kimaya-olive/10 to-kimaya-cream rounded-2xl p-6 border border-kimaya-olive/20">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center shadow-sm">
-              <Navigation size={24} className="text-kimaya-olive" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Attendance Table */}
+          <motion.div variants={item} className="lg:col-span-2 bg-white rounded-2xl border border-kimaya-cream-dark/30 overflow-hidden">
+            <div className="px-6 py-4 border-b border-kimaya-cream-dark/20">
+              <h2 className="text-lg font-serif text-kimaya-brown">Daftar Kehadiran</h2>
             </div>
-            <div>
-              <h3 className="text-lg font-serif text-kimaya-brown">Check-in dengan GPS + Face</h3>
-              <p className="text-sm text-kimaya-brown-light/60 mt-0.5">
-                {gpsStatus === "idle" && !faceVerified && "Langkah 1: Verifikasi wajah terlebih dahulu"}
-                {gpsStatus === "idle" && faceVerified && "Wajah ✓ — Klik GPS Check-in untuk absen"}
-                {gpsStatus === "loading" && "📡 Mendapatkan lokasi GPS..."}
-                {gpsStatus === "success" && gpsCoords && `📍 Lat: ${gpsCoords.lat.toFixed(6)}, Lng: ${gpsCoords.lng.toFixed(6)}`}
-                {gpsStatus === "error" && "❌ GPS gagal. Aktifkan izin lokasi di browser."}
-              </p>
-              {gpsResult && (
-                <div className="flex items-center gap-2 mt-1">
-                  {gpsResult.gpsValid
-                    ? <span className="text-xs text-kimaya-olive flex items-center gap-1"><ShieldCheck size={12} /> Lokasi terverifikasi ({gpsResult.distance}m)</span>
-                    : <span className="text-xs text-amber-600 flex items-center gap-1"><ShieldAlert size={12} /> Di luar radius ({gpsResult.distance}m / max {gpsResult.gpsRadius}m)</span>
-                  }
-                </div>
-              )}
-              {/* Face verification badge */}
-              {faceChecking && (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-blue-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Membandingkan wajah...</span>
-                </div>
-              )}
-              {faceVerified && faceMatchScore !== null && (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-kimaya-olive flex items-center gap-1"><ScanFace size={12} /> Wajah cocok ({faceMatchScore}%)</span>
-                </div>
-              )}
-              {!faceVerified && faceMatchScore !== null && (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12} /> Wajah tidak cocok ({faceMatchScore}%)</span>
-                </div>
-              )}
-              {faceVerified && faceMatchScore === null && selfiePhoto && (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-kimaya-olive flex items-center gap-1"><ScanFace size={12} /> Wajah terverifikasi</span>
-                </div>
-              )}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-kimaya-cream-dark/20 bg-kimaya-cream/20">
+                    {["Karyawan", "Dept", "Check-In", "Check-Out", "Status", "GPS"].map(h => (
+                      <th key={h} className="px-4 py-3 text-xs font-semibold text-kimaya-brown-light/50 uppercase tracking-wider text-left">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map(r => {
+                    const badge = statusBadges[r.status] || statusBadges.absent;
+                    return (
+                      <tr key={r.id} className="border-b border-kimaya-cream-dark/10 hover:bg-kimaya-cream/20 transition-colors">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-kimaya-olive/10 flex items-center justify-center text-xs font-semibold text-kimaya-olive">{r.avatar}</div>
+                            <span className="text-sm font-medium text-kimaya-brown">{r.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-kimaya-brown-light/60">{r.dept}</td>
+                        <td className="px-4 py-3.5 text-sm font-mono text-kimaya-brown">{r.checkIn}</td>
+                        <td className="px-4 py-3.5 text-sm font-mono text-kimaya-brown-light/60">{r.checkOut}</td>
+                        <td className="px-4 py-3.5"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", badge.cls)}>{badge.label}</span></td>
+                        <td className="px-4 py-3.5">
+                          {r.gpsVerified
+                            ? <span className="text-xs text-kimaya-olive flex items-center gap-1"><Shield size={12} /> GPS ✓</span>
+                            : <span className="text-xs text-kimaya-brown-light/30">{r.method}</span>
+                          }
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {records.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-kimaya-brown-light/40">Tidak ada data absensi</td></tr>}
+                </tbody>
+              </table>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Face Verify Button */}
-            <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowFaceCapture(true)}
-              className={cn(
-                "px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 transition-all",
-                faceVerified
-                  ? "bg-green-50 text-green-600 border border-green-200"
-                  : "bg-white text-kimaya-olive border border-kimaya-olive/30 hover:bg-kimaya-olive/5"
-              )}>
-              <ScanFace size={16} />
-              {faceVerified ? "Wajah ✓" : "Verifikasi Wajah"}
-            </motion.button>
-            {/* GPS Check-in Button */}
-            <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleCheckIn()} disabled={checkingIn || !faceVerified || stampingPhoto}
-              className="px-6 py-3 rounded-xl bg-kimaya-olive text-white text-sm font-medium hover:bg-kimaya-olive-dark transition-all shadow-lg shadow-kimaya-olive/20 flex items-center gap-2 disabled:opacity-50">
-              {checkingIn || stampingPhoto ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-              {stampingPhoto ? "Memproses foto..." : checkingIn ? "Check-in..." : "Check-in GPS"}
-            </motion.button>
-          </div>
-        </div>
-      </motion.div>
-      )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {statCards.map(s => { const Icon = s.icon; return (
-          <motion.div key={s.label} variants={item} className="bg-white rounded-2xl p-5 border border-kimaya-cream-dark/30">
-            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-3", s.cls)}><Icon size={18} /></div>
-            <p className="text-2xl font-semibold text-kimaya-brown">{s.value}</p>
-            <p className="text-xs text-kimaya-brown-light/50 mt-0.5">{s.label}</p>
           </motion.div>
-        ); })}
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Attendance Table */}
-        <motion.div variants={item} className="lg:col-span-2 bg-white rounded-2xl border border-kimaya-cream-dark/30 overflow-hidden">
-          <div className="px-6 py-4 border-b border-kimaya-cream-dark/20">
-            <h2 className="text-lg font-serif text-kimaya-brown">Daftar Kehadiran</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-kimaya-cream-dark/20 bg-kimaya-cream/20">
-                  {["Karyawan", "Dept", "Check-In", "Check-Out", "Status", "GPS"].map(h => (
-                    <th key={h} className="px-4 py-3 text-xs font-semibold text-kimaya-brown-light/50 uppercase tracking-wider text-left">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {records.map(r => {
-                  const badge = statusBadges[r.status] || statusBadges.absent;
-                  return (
-                    <tr key={r.id} className="border-b border-kimaya-cream-dark/10 hover:bg-kimaya-cream/20 transition-colors">
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-kimaya-olive/10 flex items-center justify-center text-xs font-semibold text-kimaya-olive">{r.avatar}</div>
-                          <span className="text-sm font-medium text-kimaya-brown">{r.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-xs text-kimaya-brown-light/60">{r.dept}</td>
-                      <td className="px-4 py-3.5 text-sm font-mono text-kimaya-brown">{r.checkIn}</td>
-                      <td className="px-4 py-3.5 text-sm font-mono text-kimaya-brown-light/60">{r.checkOut}</td>
-                      <td className="px-4 py-3.5"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", badge.cls)}>{badge.label}</span></td>
-                      <td className="px-4 py-3.5">
-                        {r.gpsVerified
-                          ? <span className="text-xs text-kimaya-olive flex items-center gap-1"><Shield size={12} /> GPS ✓</span>
-                          : <span className="text-xs text-kimaya-brown-light/30">{r.method}</span>
-                        }
-                      </td>
-                    </tr>
-                  );
-                })}
-                {records.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-kimaya-brown-light/40">Tidak ada data absensi</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-
-        {/* Leave Requests */}
-        <motion.div variants={item} className="bg-white rounded-2xl border border-kimaya-cream-dark/30 overflow-hidden">
-          <div className="px-6 py-4 border-b border-kimaya-cream-dark/20">
-            <h2 className="text-lg font-serif text-kimaya-brown">Pengajuan Cuti</h2>
-          </div>
-          <div className="p-4 space-y-3">
-            {leaves.map(l => {
-              const badge = leaveBadges[l.status] || leaveBadges.pending;
-              return (
-                <div key={l.id} className="p-3 rounded-xl border border-kimaya-cream-dark/20">
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-kimaya-olive/10 flex items-center justify-center text-xs font-semibold text-kimaya-olive">{l.avatar}</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-kimaya-brown">{l.name}</p>
-                      <p className="text-xs text-kimaya-brown-light/40">{l.type}</p>
+          {/* Leave Requests */}
+          <motion.div variants={item} className="bg-white rounded-2xl border border-kimaya-cream-dark/30 overflow-hidden">
+            <div className="px-6 py-4 border-b border-kimaya-cream-dark/20">
+              <h2 className="text-lg font-serif text-kimaya-brown">Pengajuan Cuti</h2>
+            </div>
+            <div className="p-4 space-y-3">
+              {leaves.map(l => {
+                const badge = leaveBadges[l.status] || leaveBadges.pending;
+                return (
+                  <div key={l.id} className="p-3 rounded-xl border border-kimaya-cream-dark/20">
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-kimaya-olive/10 flex items-center justify-center text-xs font-semibold text-kimaya-olive">{l.avatar}</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-kimaya-brown">{l.name}</p>
+                        <p className="text-xs text-kimaya-brown-light/40">{l.type}</p>
+                      </div>
+                      <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", badge.cls)}>{badge.label}</span>
                     </div>
-                    <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", badge.cls)}>{badge.label}</span>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-kimaya-brown-light/50">{l.from} — {l.to}</span>
+                      {l.status === "pending" && <button onClick={() => handleApproveLeave(l.id)} className="text-kimaya-olive font-medium">Approve</button>}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-kimaya-brown-light/50">{l.from} — {l.to}</span>
-                    {l.status === "pending" && <button onClick={() => handleApproveLeave(l.id)} className="text-kimaya-olive font-medium">Approve</button>}
-                  </div>
-                </div>
-              );
-            })}
-            {leaves.length === 0 && <p className="text-center text-sm text-kimaya-brown-light/40 py-8">Tidak ada pengajuan cuti</p>}
-          </div>
-        </motion.div>
-      </div>
-    </motion.div>
+                );
+              })}
+              {leaves.length === 0 && <p className="text-center text-sm text-kimaya-brown-light/40 py-8">Tidak ada pengajuan cuti</p>}
+            </div>
+          </motion.div>
+        </div>
+      </motion.div>
 
-    {/* Face Detector Modal for Attendance */}
-    <AnimatePresence>
-      {showFaceCapture && (
-        <FaceDetector
-          mode="attendance"
-          registeredFaceUrl={user?.facePhotoUrl}
-          onCapture={handleFaceVerified}
-          onClose={() => setShowFaceCapture(false)}
-          autoCaptureDelay={1500}
-        />
-      )}
-    </AnimatePresence>
+      {/* Face Detector Modal for Attendance */}
+      <AnimatePresence>
+        {showFaceCapture && (
+          <FaceDetector
+            mode="attendance"
+            registeredFaceUrl={user?.facePhotoUrl}
+            onCapture={handleFaceVerified}
+            onClose={() => setShowFaceCapture(false)}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }

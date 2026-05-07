@@ -20,6 +20,22 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate face photo is a real image and not too large
+    if (!facePhoto.startsWith("data:image/")) {
+      return NextResponse.json(
+        { error: "Format foto wajah tidak valid" },
+        { status: 400 }
+      );
+    }
+
+    const photoSizeEstimate = (facePhoto.length * 3) / 4;
+    if (photoSizeEstimate > 2_000_000) {
+      return NextResponse.json(
+        { error: "Foto wajah terlalu besar (max 2MB). Coba ambil ulang." },
+        { status: 400 }
+      );
+    }
+
     if (!phone || phone.trim().length < 8) {
       return NextResponse.json(
         { error: "Nomor WhatsApp wajib diisi (minimal 8 digit)" },

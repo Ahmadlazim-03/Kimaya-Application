@@ -25,7 +25,7 @@ interface NavDef {
 
 const allNavItems: NavDef[] = [
   { label: "Dashboard",  href: "/dashboard",            icon: "LayoutDashboard", section: "main",  roles: ["DEVELOPER", "ADMIN", "THERAPIST"] },
-  { label: "Absensi",    href: "/dashboard/attendance",  icon: "Clock",           section: "main",  roles: ["DEVELOPER", "ADMIN", "THERAPIST"] },
+  { label: "Absensi",    href: "/dashboard/attendance",  icon: "Clock",           section: "main",  roles: ["ADMIN", "THERAPIST"] },
   { label: "Laporan",    href: "/dashboard/reports",     icon: "FileText",        section: "main",  roles: ["DEVELOPER", "ADMIN", "THERAPIST"] },
   { label: "Skoring",    href: "/dashboard/scoring",     icon: "Star",            section: "main",  roles: ["DEVELOPER", "ADMIN"] },
   { label: "Reminder",   href: "/dashboard/reminders",   icon: "Bell",            section: "main",  roles: ["DEVELOPER", "ADMIN"] },

@@ -515,7 +515,7 @@ export default function FaceDetector({
           {matchScore !== null && capturedImage && (
             <div className="absolute top-4 right-4">
               <div className={cn("px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md",
-                matchScore >= 82 ? "bg-green-500/20 text-green-300 border border-green-400/30" :
+                matchScore >= 70 ? "bg-green-500/20 text-green-300 border border-green-400/30" :
                 "bg-red-500/20 text-red-300 border border-red-400/30")}>
                 Skor: {matchScore}%
               </div>

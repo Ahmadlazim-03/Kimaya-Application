@@ -20,7 +20,7 @@ export async function GET(request: Request) {
         include: { user: { select: { fullName: true } }, approvedBy: { select: { fullName: true } } },
         orderBy: { createdAt: "desc" },
       }),
-      prisma.user.count({ where: { role: { in: ["THERAPIST", "DEVELOPER"] }, status: { in: ["ACTIVE", "PROBATION"] } } }),
+      prisma.user.count({ where: { role: "THERAPIST", status: { in: ["ACTIVE", "PROBATION"] } } }),
     ]);
 
     const records = attendances.map((a) => ({
@@ -89,9 +89,9 @@ export async function POST(request: Request) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const now = new Date();
 
-    // ── Face verification for check-in (non-ADMIN only) ──
+    // ── Face verification for check-in (non-ADMIN & non-DEVELOPER only) ──
     let faceMatchScore: number | null = null;
-    if (action === "checkin" && session.role !== "ADMIN") {
+    if (action === "checkin" && session.role !== "ADMIN" && session.role !== "DEVELOPER") {
       // Validate user has registered face
       const userFace = await prisma.user.findUnique({
         where: { id: userId },

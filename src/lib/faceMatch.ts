@@ -117,6 +117,15 @@ export async function compareFaces(
   // > 0.55 = different person
   const DISTANCE_THRESHOLD = 0.5;
 
+  // Convert Euclidean distance to intuitive percentage score (0-100)
+  // Uses exponential decay: score = 100 * exp(-k * distance^2)
+  // This maps: dist 0.0 → 100%, 0.3 → ~91%, 0.5 → ~78%, 0.6 → ~70%, 1.0 → ~37%
+  const K = 1.0;
+  const distToScore = (dist: number): number => {
+    const raw = 100 * Math.exp(-K * dist * dist);
+    return Math.max(0, Math.min(100, Math.round(raw)));
+  };
+
   try {
     console.log("[FaceMatch] Starting face recognition comparison...");
 
@@ -140,10 +149,8 @@ export async function compareFaces(
     // Compute Euclidean distance between face descriptors
     const distance = faceapi.euclideanDistance(desc1, desc2);
 
-    // Convert distance to percentage score (0-100)
-    // Distance range for faces: 0.0 (identical) to ~1.5 (very different)
-    // Map: 0.0 → 100%, 0.5 → 50%, 1.0 → 0%
-    const scorePercent = Math.max(0, Math.min(100, Math.round((1 - distance) * 100)));
+    // Convert distance to intuitive percentage score using exponential decay
+    const scorePercent = distToScore(distance);
     const isMatch = distance <= DISTANCE_THRESHOLD;
 
     console.log("[FaceMatch] ═══════════════════════════════");

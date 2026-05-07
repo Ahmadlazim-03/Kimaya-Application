@@ -9,6 +9,7 @@ import {
   Users, CheckCircle2, FileText, Star, Clock, Upload, Bell, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/AuthContext";
 
 interface DashboardData {
   stats: { totalEmployees: number; presentToday: number; attendanceRate: string; pendingReports: number; avgScore: number };
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<"today" | "week" | "month">("today");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetch("/api/dashboard")
@@ -257,11 +259,13 @@ export default function DashboardPage() {
           <h2 className="text-lg font-serif text-kimaya-brown mb-5">Aksi Cepat</h2>
           <div className="space-y-3">
             {[
-              { href: "/dashboard/attendance", icon: Clock, label: "Check-In Sekarang", desc: "Catat kehadiran hari ini", primary: true },
+              { href: "/dashboard/attendance", icon: Clock, label: "Check-In Sekarang", desc: "Catat kehadiran hari ini", primary: true, roles: ["ADMIN", "THERAPIST"] },
               { href: "/dashboard/reports", icon: Upload, label: "Upload Laporan", desc: "Kirim bukti laporan kerja" },
               { href: "/dashboard/scoring", icon: Star, label: "Lihat Skor", desc: "Cek performa karyawan" },
               { href: "/dashboard/reminders", icon: Bell, label: "Buat Reminder", desc: "Kirim pengingat via WhatsApp" },
-            ].map((act) => {
+            ]
+            .filter(act => !act.roles || act.roles.includes(user?.role || ""))
+            .map((act) => {
               const Icon = act.icon;
               return (
                 <motion.a

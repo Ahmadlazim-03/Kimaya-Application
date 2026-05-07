@@ -24,7 +24,10 @@ export async function POST(request: Request) {
         const { selfiePhoto, matchScore } = body;
 
         // ── Validate match score ──
-        if (typeof matchScore !== "number" || matchScore < 82 || matchScore > 100) {
+        // With face-api.js exponential decay scoring:
+        // Same person (dist ~0.3) = ~91%, threshold dist 0.5 = ~78%
+        // Server accepts scores >= 70% (provides safety margin)
+        if (typeof matchScore !== "number" || matchScore < 70 || matchScore > 100) {
             return NextResponse.json(
                 { error: "Skor pencocokan wajah tidak valid atau terlalu rendah" },
                 { status: 400 }

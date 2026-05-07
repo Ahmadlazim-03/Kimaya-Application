@@ -32,7 +32,7 @@ export async function GET() {
 
     return NextResponse.json({
       user,
-      needsOnboarding: !user.onboardingCompleted,
+      needsOnboarding: user.role === "DEVELOPER" ? false : !user.onboardingCompleted,
     });
   } catch {
     return NextResponse.json({ error: "Session tidak valid" }, { status: 401 });

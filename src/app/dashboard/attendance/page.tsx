@@ -222,8 +222,8 @@ export default function AttendancePage() {
           </div>
         </motion.div>
 
-        {/* GPS Check-in Card — hidden for ADMIN (admin tidak absen) */}
-        {user?.role !== "ADMIN" && (
+        {/* GPS Check-in Card — hidden for ADMIN & DEVELOPER (IT/Admin tidak absen) */}
+        {user?.role !== "ADMIN" && user?.role !== "DEVELOPER" && (
           <motion.div variants={item} className="bg-gradient-to-r from-kimaya-olive/10 to-kimaya-cream rounded-2xl p-6 border border-kimaya-olive/20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">

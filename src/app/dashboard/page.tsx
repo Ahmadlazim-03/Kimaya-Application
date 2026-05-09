@@ -263,14 +263,27 @@ export default function DashboardPage() {
               { href: "/dashboard/reports", icon: Upload, label: "Upload Laporan", desc: "Kirim bukti laporan kerja" },
               { href: "/dashboard/scoring", icon: Star, label: "Lihat Skor", desc: "Cek performa karyawan" },
               { href: "/dashboard/reminders", icon: Bell, label: "Buat Reminder", desc: "Kirim pengingat via WhatsApp" },
+              { href: "#", icon: Bell, label: "Test Getaran & Notifikasi", desc: "Coba fitur getar PWA", onClick: (e: any) => {
+                e.preventDefault();
+                if ("vibrate" in navigator) {
+                  navigator.vibrate([200, 100, 200, 100, 500]);
+                }
+                if ("Notification" in window) {
+                  Notification.requestPermission().then(p => {
+                    if (p === "granted") new Notification("Test Notifikasi", { body: "Berhasil! Ini fitur push notifikasi.", icon: "/icons/icon-192x192.png" });
+                  });
+                }
+                alert("Getaran & Notifikasi dikirim! (Pastikan HP tidak mode silent)");
+              } },
             ]
             .filter(act => !act.roles || act.roles.includes(user?.role || ""))
             .map((act) => {
               const Icon = act.icon;
               return (
                 <motion.a
-                  key={act.href}
+                  key={act.label}
                   href={act.href}
+                  onClick={act.onClick as any}
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   className={cn(

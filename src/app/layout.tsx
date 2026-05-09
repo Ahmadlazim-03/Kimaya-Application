@@ -1,10 +1,23 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+export const viewport = {
+  themeColor: "#4A5D23",
+};
+
 export const metadata: Metadata = {
   title: "Kimaya Management — Kimaya Experience",
   description: "Employee Management & Productivity Platform for Kimaya Experience",
-  icons: { icon: "/favicon.ico" },
+  manifest: "/manifest.json",
+  icons: { 
+    icon: "/favicon.ico",
+    apple: "/icons/icon-192x192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Kimaya",
+  },
 };
 
 export default function RootLayout({

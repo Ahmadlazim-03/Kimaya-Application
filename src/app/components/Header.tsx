@@ -6,12 +6,7 @@ import { Search, Bell, Calendar, ChevronDown, User, Settings, LogOut, Menu, Shie
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 
-const notifications = [
-  { id: 1, text: "Ahmad belum check-in hari ini", time: "5 menit lalu", type: "warning" as const },
-  { id: 2, text: "Laporan baru dari Siti perlu di-review", time: "15 menit lalu", type: "info" as const },
-  { id: 3, text: "Skor mingguan telah dihitung", time: "1 jam lalu", type: "success" as const },
-  { id: 4, text: "3 pengajuan cuti menunggu approval", time: "2 jam lalu", type: "warning" as const },
-];
+const notifications: { id: number; text: string; time: string; type: "warning" | "info" | "success" }[] = [];
 
 const dotColors = {
   warning: "bg-kimaya-gold",
@@ -21,7 +16,8 @@ const dotColors = {
 
 const roleLabels: Record<string, string> = {
   DEVELOPER: "Developer",
-  ADMIN: "Admin",
+  MANAGER: "Manager",
+  CS: "Customer Service",
   THERAPIST: "Therapist",
 };
 
@@ -80,7 +76,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
             onClick={() => { setShowNotif(!showNotif); setShowProfile(false); }}
             className="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-kimaya-cream transition-colors text-kimaya-brown-light">
             <Bell size={19} strokeWidth={1.5} />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-kimaya-gold rounded-full ring-2 ring-white" />
+            {notifications.length > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-kimaya-gold rounded-full ring-2 ring-white" />}
           </motion.button>
 
           <AnimatePresence>
@@ -92,7 +88,11 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
                   <span className="text-xs bg-kimaya-olive/10 text-kimaya-olive px-2 py-0.5 rounded-full font-medium">{notifications.length} baru</span>
                 </div>
                 <div className="max-h-80 overflow-y-auto">
-                  {notifications.map((n, i) => (
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <p className="text-sm text-kimaya-brown-light/40">Belum ada notifikasi</p>
+                    </div>
+                  ) : notifications.map((n, i) => (
                     <motion.div key={n.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
                       className="px-4 py-3 hover:bg-kimaya-cream/30 transition-colors border-b border-kimaya-cream-dark/10 last:border-0 cursor-pointer">
                       <div className="flex gap-3">

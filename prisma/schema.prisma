@@ -17,7 +17,8 @@ datasource db {
 
 enum UserRole {
   DEVELOPER
-  ADMIN
+  MANAGER
+  CS
   THERAPIST
 }
 
@@ -139,6 +140,8 @@ model User {
   departmentId     String?     @map("department_id")
   location         Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
   locationId       String?     @map("location_id")
+  shift            Shift?      @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  shiftId          String?     @map("shift_id")
 
   attendances        Attendance[]
   leaveRequests      LeaveRequest[]       @relation("UserLeaves")
@@ -163,9 +166,26 @@ model User {
   @@map("users")
 }
 
+model Shift {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(50) // e.g., "Pagi", "Siang"
+  startTime   String   @map("start_time") // e.g., "09:00"
+  endTime     String   @map("end_time")   // e.g., "18:00"
+  description String?  @db.Text
+
+  users       User[]
+  attendances Attendance[]
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("shifts")
+}
+
 model Attendance {
   id             String           @id @default(uuid())
   userId         String           @map("user_id")
+  shiftId        String?          @map("shift_id")
   date           DateTime         @default(now()) @db.Date
   checkInTime    DateTime?        @map("check_in_time")
   checkOutTime   DateTime?        @map("check_out_time")
@@ -174,11 +194,14 @@ model Attendance {
   checkOutLat    Decimal?         @map("check_out_lat") @db.Decimal(10, 8)
   checkOutLng    Decimal?         @map("check_out_lng") @db.Decimal(11, 8)
   checkInSelfie  String?          @map("check_in_selfie_url") @db.Text
+  checkOutSelfie String?          @map("check_out_selfie_url") @db.Text
   checkInMethod  String           @default("WEB") @map("check_in_method") @db.VarChar(20)
   status         AttendanceStatus @default(ABSENT)
+  isEarlyDeparture Boolean        @default(false) @map("is_early_departure")
   notes          String?          @db.Text
 
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shift          Shift?           @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   approvedBy     User?            @relation("AttendanceApprovals", fields: [approvedById], references: [id])
   approvedById   String?          @map("approved_by")
 

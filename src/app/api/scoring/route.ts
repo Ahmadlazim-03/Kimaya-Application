@@ -72,11 +72,11 @@ export async function GET() {
       }));
 
     const scoreComponents = [
-      { name: "Kehadiran", weight: `${config?.attendanceWeight || 30}%`, emoji: "⏰" },
-      { name: "Kelengkapan", weight: `${config?.reportCompletenessWeight || 25}%`, emoji: "📄" },
-      { name: "Kualitas", weight: `${config?.reportQualityWeight || 20}%`, emoji: "⭐" },
-      { name: "Respons", weight: `${config?.responseSpeedWeight || 15}%`, emoji: "⚡" },
-      { name: "Inisiatif", weight: `${config?.initiativeWeight || 10}%`, emoji: "🎯" },
+      { name: "Kehadiran", weight: `${config?.attendanceWeight || 30}%` },
+      { name: "Kelengkapan", weight: `${config?.reportCompletenessWeight || 25}%` },
+      { name: "Kualitas", weight: `${config?.reportQualityWeight || 20}%` },
+      { name: "Respons", weight: `${config?.responseSpeedWeight || 15}%` },
+      { name: "Inisiatif", weight: `${config?.initiativeWeight || 10}%` },
     ];
 
     return NextResponse.json({

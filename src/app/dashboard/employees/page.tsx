@@ -7,12 +7,24 @@ import { cn } from "@/lib/utils";
 
 
 interface Employee {
-  id: string; name: string; email: string; phone: string; dept: string;
+  id: string; name: string; email: string; phone: string; role: string;
   location: string; status: string; joinDate: string; avatar: string;
 }
 
-const departments = ["Semua Departemen", "Spa Therapist", "Beauty Expert", "Front Desk", "Operations", "Marketing", "IT Support", "HR & Admin"];
+const roles = [
+  { value: "THERAPIST", label: "Therapist" },
+  { value: "CS", label: "Customer Service" },
+  { value: "DEVELOPER", label: "IT / Developer" },
+];
+const roleFilters = ["Semua Role", "THERAPIST", "CS", "DEVELOPER"];
 const locations = ["Semua Lokasi", "Kimaya Spa Banda Aceh", "Kimaya Spa Surabaya", "Kimaya Spa Gading Serpong", "Kimaya Spa Bintaro"];
+
+const roleBadges: Record<string, { label: string; cls: string }> = {
+  THERAPIST: { label: "Therapist", cls: "bg-kimaya-olive/10 text-kimaya-olive" },
+  CS: { label: "Customer Service", cls: "bg-blue-50 text-blue-600" },
+  DEVELOPER: { label: "IT / Developer", cls: "bg-purple-50 text-purple-600" },
+  MANAGER: { label: "Manager", cls: "bg-amber-50 text-amber-700" },
+};
 
 const statusBadges: Record<string, { label: string; cls: string }> = {
   active: { label: "Aktif", cls: "bg-kimaya-olive/10 text-kimaya-olive" },
@@ -28,7 +40,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState("Semua Departemen");
+  const [roleFilter, setRoleFilter] = useState("Semua Role");
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [saving, setSaving] = useState(false);
@@ -38,16 +50,15 @@ export default function EmployeesPage() {
   // Form state
   const [formName, setFormName] = useState("");
   const [formEmail, setFormEmail] = useState("");
-  const [formPhone, setFormPhone] = useState("");
-  const [formDept, setFormDept] = useState("Spa Therapist");
+  const [formRole, setFormRole] = useState("THERAPIST");
   const [formLoc, setFormLoc] = useState("Kimaya Spa Gading Serpong");
 
   const fetchEmployees = useCallback(() => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
-    if (deptFilter !== "Semua Departemen") params.set("dept", deptFilter);
+    if (roleFilter !== "Semua Role") params.set("role", roleFilter);
     fetch(`/api/employees?${params}`).then(r => r.json()).then(d => { setEmployees(d); setLoading(false); }).catch(() => setLoading(false));
-  }, [search, deptFilter]);
+  }, [search, roleFilter]);
 
   useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
 
@@ -55,20 +66,20 @@ export default function EmployeesPage() {
 
   const openCreate = () => {
     setEditingEmployee(null);
-    setFormName(""); setFormEmail(""); setFormPhone(""); setFormDept("Spa Therapist"); setFormLoc("Kimaya Spa Gading Serpong");
+    setFormName(""); setFormEmail(""); setFormRole("THERAPIST"); setFormLoc("Kimaya Spa Gading Serpong");
     setShowModal(true);
   };
 
   const openEdit = (emp: Employee) => {
     setEditingEmployee(emp);
-    setFormName(emp.name); setFormEmail(emp.email); setFormPhone(emp.phone);
-    setFormDept(emp.dept); setFormLoc(emp.location);
+    setFormName(emp.name); setFormEmail(emp.email);
+    setFormRole(emp.role); setFormLoc(emp.location);
     setShowModal(true);
   };
 
   const handleSubmit = async () => {
     setSaving(true);
-    const body = { name: formName, email: formEmail, phone: formPhone, departmentName: formDept, locationName: formLoc };
+    const body = { name: formName, email: formEmail, role: formRole, locationName: formLoc };
     if (editingEmployee) {
       const res = await fetch(`/api/employees/${editingEmployee.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
@@ -85,12 +96,12 @@ export default function EmployeesPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Yakin ingin menonaktifkan "${name}"?`)) return;
+    if (!confirm(`Yakin ingin menghapus "${name}"? Data karyawan akan dihapus permanen.`)) return;
     try {
       const res = await fetch(`/api/employees/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) { showToast(`❌ ${data.error || "Gagal menghapus"}`); return; }
-      showToast("✅ Karyawan berhasil dinonaktifkan");
+      showToast("✅ Karyawan berhasil dihapus");
       fetchEmployees();
     } catch {
       showToast("❌ Tidak dapat terhubung ke server");
@@ -132,9 +143,9 @@ export default function EmployeesPage() {
             className="bg-transparent text-sm text-kimaya-brown placeholder-kimaya-brown-light/40 outline-none w-full" />
         </div>
         <div className="relative">
-          <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
+          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
             className="appearance-none pl-10 pr-8 py-2.5 rounded-xl border border-kimaya-cream-dark/30 bg-white text-sm text-kimaya-brown focus:outline-none cursor-pointer">
-            {departments.map(d => <option key={d}>{d}</option>)}
+            {roleFilters.map(d => <option key={d} value={d}>{d === "Semua Role" ? d : roleBadges[d]?.label || d}</option>)}
           </select>
           <Filter size={14} className="absolute left-3.5 top-3.5 text-kimaya-brown-light/40 pointer-events-none" />
           <ChevronDown size={14} className="absolute right-3 top-3.5 text-kimaya-brown-light/40 pointer-events-none" />
@@ -147,7 +158,7 @@ export default function EmployeesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-kimaya-cream-dark/30 bg-kimaya-cream/20">
-                {["Karyawan", "Departemen", "Lokasi", "Telepon", "Status", "Aksi"].map(h => (
+                {["Karyawan", "Role", "Lokasi", "Status", "Aksi"].map(h => (
                   <th key={h} className={cn("px-5 py-3.5 text-xs font-semibold text-kimaya-brown-light/50 uppercase tracking-wider", h === "Aksi" ? "text-center" : "text-left")}>{h}</th>
                 ))}
               </tr>
@@ -155,6 +166,7 @@ export default function EmployeesPage() {
             <tbody>
               {filtered.map(emp => {
                 const badge = statusBadges[emp.status] || statusBadges.active;
+                const roleBadge = roleBadges[emp.role] || roleBadges.THERAPIST;
                 return (
                   <tr key={emp.id} className="border-b border-kimaya-cream-dark/10 last:border-0 hover:bg-kimaya-cream/20 transition-colors">
                     <td className="px-5 py-4">
@@ -166,9 +178,8 @@ export default function EmployeesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-sm text-kimaya-brown-light/60">{emp.dept}</td>
+                    <td className="px-5 py-4"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", roleBadge.cls)}>{roleBadge.label}</span></td>
                     <td className="px-5 py-4 text-sm text-kimaya-brown-light/60">{emp.location}</td>
-                    <td className="px-5 py-4 text-xs font-mono text-kimaya-brown-light/60">{emp.phone}</td>
                     <td className="px-5 py-4"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", badge.cls)}>{badge.label}</span></td>
                     <td className="px-5 py-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
@@ -200,12 +211,12 @@ export default function EmployeesPage() {
             className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               transition={{ type: "spring", damping: 25 }} onClick={e => e.stopPropagation()}
-              className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+              className="bg-white rounded-2xl w-full max-w-2xl p-8 shadow-2xl">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-serif text-kimaya-brown">{editingEmployee ? "Edit Karyawan" : "Tambah Karyawan"}</h2>
+                <h2 className="text-xl font-serif text-kimaya-brown">{editingEmployee ? "Edit Karyawan" : "Tambah Karyawan Baru"}</h2>
                 <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-lg hover:bg-kimaya-cream flex items-center justify-center text-kimaya-brown-light/40"><XIcon size={18} /></button>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-kimaya-brown-light mb-2">Nama Lengkap</label>
                   <input type="text" value={formName} onChange={e => setFormName(e.target.value)} placeholder="Masukkan nama lengkap"
@@ -216,17 +227,12 @@ export default function EmployeesPage() {
                   <input type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)} placeholder="nama@kimayaexperience.com"
                     className="w-full px-4 py-3 rounded-xl border border-kimaya-cream-dark bg-kimaya-cream-light text-sm text-kimaya-brown placeholder-kimaya-brown-light/40 focus:outline-none focus:ring-2 focus:ring-kimaya-olive/30" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-kimaya-brown-light mb-2">Telepon</label>
-                  <input type="tel" value={formPhone} onChange={e => setFormPhone(e.target.value)} placeholder="+62 812-XXXX-XXXX"
-                    className="w-full px-4 py-3 rounded-xl border border-kimaya-cream-dark bg-kimaya-cream-light text-sm text-kimaya-brown placeholder-kimaya-brown-light/40 focus:outline-none focus:ring-2 focus:ring-kimaya-olive/30" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-kimaya-brown-light mb-2">Departemen</label>
-                    <select value={formDept} onChange={e => setFormDept(e.target.value)}
+                    <label className="block text-sm font-medium text-kimaya-brown-light mb-2">Role</label>
+                    <select value={formRole} onChange={e => setFormRole(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border border-kimaya-cream-dark bg-kimaya-cream-light text-sm text-kimaya-brown focus:outline-none focus:ring-2 focus:ring-kimaya-olive/30">
-                      {departments.filter(d => d !== "Semua Departemen").map(d => <option key={d}>{d}</option>)}
+                      {roles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                     </select>
                   </div>
                   <div>
@@ -239,9 +245,10 @@ export default function EmployeesPage() {
                 </div>
 
                 {/* Info: password & onboarding */}
-                <div className="bg-kimaya-olive/5 border border-kimaya-olive/20 rounded-xl p-3 text-xs text-kimaya-brown-light/70">
+                <div className="bg-kimaya-olive/5 border border-kimaya-olive/20 rounded-xl p-4 text-xs text-kimaya-brown-light/70 space-y-1.5">
                   <p>💡 Password default: <span className="font-semibold text-kimaya-brown">kimaya2026</span></p>
-                  <p className="mt-1">📸 Verifikasi wajah & profil dilengkapi oleh karyawan saat login pertama kali.</p>
+                  <p>📸 Foto wajah & nomor telepon akan dilengkapi oleh karyawan saat onboarding pertama kali.</p>
+                  {formRole !== "THERAPIST" && <p>🔓 Role <strong>{roles.find(r => r.value === formRole)?.label}</strong> tidak memerlukan verifikasi wajah.</p>}
                 </div>
 
                 <motion.button whileTap={{ scale: 0.98 }} onClick={handleSubmit} disabled={saving || !formName || !formEmail}

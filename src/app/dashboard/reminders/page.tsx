@@ -2,18 +2,30 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Plus, Pencil, Trash2, Pause, Play, X as XIcon, Loader2, Check, MessageCircle, Send } from "lucide-react";
+import { Bell, Plus, Pencil, Trash2, Pause, Play, X as XIcon, Loader2, Check, MessageCircle, Send, History, CheckCircle, AlertCircle, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Reminder { id: string; title: string; messageTemplate: string; target: string; schedule: string; channel: string; status: string; lastSent: string; }
+interface LogEntry { id: string; userName: string; phone: string; status: string; channel: string; sentAt: string; error: string | null; }
+interface LogStats { total: number; sent: number; delivered: number; read: number; failed: number; }
 
-const channels = ["WHATSAPP", "WHATSAPP_WEB", "WHATSAPP_EMAIL", "EMAIL"];
 const schedules = ["DAILY", "WEEKLY", "IMMEDIATE"];
-const channelLabels: Record<string, string> = { WHATSAPP: "WhatsApp", WHATSAPP_WEB: "WhatsApp + Web", WHATSAPP_EMAIL: "WhatsApp + Email", EMAIL: "Email" };
 const scheduleLabels: Record<string, string> = { DAILY: "Setiap Hari", WEEKLY: "Setiap Minggu", IMMEDIATE: "Segera" };
+const targetRoles = [
+  { value: "", label: "Semua Therapist" },
+  { value: "THERAPIST", label: "Therapist" },
+  { value: "CS", label: "Customer Service" },
+];
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
+
+const logStatusBadge: Record<string, { label: string; cls: string }> = {
+  SENT: { label: "Terkirim", cls: "bg-blue-50 text-blue-600" },
+  DELIVERED: { label: "Diterima", cls: "bg-emerald-50 text-emerald-600" },
+  READ: { label: "Dibaca", cls: "bg-kimaya-olive/10 text-kimaya-olive" },
+  FAILED: { label: "Gagal", cls: "bg-red-50 text-red-500" },
+};
 
 export default function RemindersPage() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -24,11 +36,18 @@ export default function RemindersPage() {
   const [sending, setSending] = useState<string | null>(null);
   const [toast, setToast] = useState("");
 
+  // Log viewer state
+  const [logReminderId, setLogReminderId] = useState<string | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logStats, setLogStats] = useState<LogStats | null>(null);
+  const [logLoading, setLogLoading] = useState(false);
+
+  // Form state
   const [formTitle, setFormTitle] = useState("");
   const [formMsg, setFormMsg] = useState("");
-  const [formChannel, setFormChannel] = useState("WHATSAPP");
   const [formSchedule, setFormSchedule] = useState("DAILY");
   const [formTime, setFormTime] = useState("08:00");
+  const [formTarget, setFormTarget] = useState("");
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
@@ -40,25 +59,25 @@ export default function RemindersPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setFormTitle(""); setFormMsg(""); setFormChannel("WHATSAPP"); setFormSchedule("DAILY"); setFormTime("08:00");
+    setFormTitle(""); setFormMsg(""); setFormSchedule("DAILY"); setFormTime("08:00"); setFormTarget("");
     setShowModal(true);
   };
 
   const openEdit = (r: Reminder) => {
     setEditing(r);
-    setFormTitle(r.title); setFormMsg(r.messageTemplate); setFormChannel("WHATSAPP"); setFormSchedule("DAILY"); setFormTime("08:00");
+    setFormTitle(r.title); setFormMsg(r.messageTemplate); setFormSchedule("DAILY"); setFormTime("08:00"); setFormTarget("");
     setShowModal(true);
   };
 
   const handleSubmit = async () => {
     setSaving(true);
-    const body = { title: formTitle, messageTemplate: formMsg, channel: formChannel, scheduleType: formSchedule, scheduledTime: formTime };
+    const body = { title: formTitle, messageTemplate: formMsg, channel: "WHATSAPP", scheduleType: formSchedule, scheduledTime: formTime, targetRole: formTarget || null };
     if (editing) {
       await fetch(`/api/reminders/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      showToast("Reminder berhasil diupdate");
+      showToast("✅ Reminder berhasil diupdate");
     } else {
       await fetch("/api/reminders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      showToast("Reminder berhasil dibuat");
+      showToast("✅ Reminder berhasil dibuat");
     }
     setSaving(false); setShowModal(false); fetchData();
   };
@@ -66,7 +85,7 @@ export default function RemindersPage() {
   const handleToggle = async (id: string, current: string) => {
     const newStatus = current === "active" ? "PAUSED" : "ACTIVE";
     await fetch(`/api/reminders/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: newStatus }) });
-    showToast(newStatus === "ACTIVE" ? "Reminder diaktifkan" : "Reminder dijeda");
+    showToast(newStatus === "ACTIVE" ? "✅ Reminder diaktifkan" : "⏸️ Reminder dijeda");
     fetchData();
   };
 
@@ -75,9 +94,13 @@ export default function RemindersPage() {
     try {
       const res = await fetch(`/api/reminders/${id}/send`, { method: "POST" });
       const data = await res.json();
-      showToast(data.message || "Reminder terkirim!");
+      if (res.ok) {
+        showToast(`✅ ${data.message}`);
+      } else {
+        showToast(`❌ ${data.error || "Gagal mengirim"}`);
+      }
     } catch {
-      showToast("⚠️ Gagal mengirim reminder. Pastikan WAHA terhubung.");
+      showToast("❌ Tidak dapat terhubung ke server");
     }
     setSending(null);
     fetchData();
@@ -86,8 +109,23 @@ export default function RemindersPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Yakin ingin menghapus reminder ini?")) return;
     await fetch(`/api/reminders/${id}`, { method: "DELETE" });
-    showToast("Reminder berhasil dihapus");
+    showToast("✅ Reminder berhasil dihapus");
     fetchData();
+  };
+
+  const openLogs = async (id: string) => {
+    setLogReminderId(id);
+    setLogLoading(true);
+    try {
+      const res = await fetch(`/api/reminders/${id}/logs`);
+      const data = await res.json();
+      setLogs(data.logs || []);
+      setLogStats(data.stats || null);
+    } catch {
+      setLogs([]);
+      setLogStats(null);
+    }
+    setLogLoading(false);
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-kimaya-olive" /></div>;
@@ -130,24 +168,32 @@ export default function RemindersPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-medium text-kimaya-brown">{r.title}</h3>
-                    <p className="text-xs text-kimaya-brown-light/50 mt-0.5 line-clamp-1">{r.messageTemplate}</p>
+                    <p className="text-xs text-kimaya-brown-light/50 mt-0.5 line-clamp-2">{r.messageTemplate}</p>
                   </div>
                   <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0",
                     r.status === "active" ? "bg-kimaya-olive/10 text-kimaya-olive" : "bg-gray-100 text-gray-400"
                   )}>{r.status === "active" ? "Aktif" : "Dijeda"}</span>
                 </div>
-                <div className="flex items-center gap-4 mt-3 flex-wrap">
-                  <span className="text-xs px-2 py-0.5 rounded bg-kimaya-cream text-kimaya-brown-light/60 flex items-center gap-1">
-                    <Send size={10} /> {r.channel}
+                <div className="flex items-center gap-3 mt-3 flex-wrap">
+                  <span className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 flex items-center gap-1">
+                    <MessageCircle size={10} /> WhatsApp
                   </span>
                   <span className="text-xs px-2 py-0.5 rounded bg-kimaya-cream text-kimaya-brown-light/60">{r.schedule}</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-600">
+                    Target: {r.target || "Therapist"}
+                  </span>
                   <span className="text-xs text-kimaya-brown-light/40">Terakhir: {r.lastSent}</span>
                   <div className="ml-auto flex items-center gap-1">
                     <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleSendNow(r.id)} disabled={sending === r.id}
                       className="px-3 py-1.5 rounded-lg bg-kimaya-olive/10 text-kimaya-olive text-xs font-medium hover:bg-kimaya-olive/20 transition-colors flex items-center gap-1 disabled:opacity-50"
-                      title="Kirim sekarang ke semua karyawan">
+                      title="Kirim sekarang">
                       {sending === r.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                       Kirim
+                    </motion.button>
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => openLogs(r.id)}
+                      className="w-8 h-8 rounded-lg hover:bg-blue-50 flex items-center justify-center text-kimaya-brown-light/40 hover:text-blue-600 transition-colors"
+                      title="Riwayat pengiriman">
+                      <History size={14} />
                     </motion.button>
                     <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleToggle(r.id, r.status)}
                       className="w-8 h-8 rounded-lg hover:bg-kimaya-cream flex items-center justify-center text-kimaya-brown-light/40 hover:text-kimaya-olive transition-colors"
@@ -176,7 +222,7 @@ export default function RemindersPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Create/Edit Modal */}
       <AnimatePresence>
         {showModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)}
@@ -196,15 +242,30 @@ export default function RemindersPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-kimaya-brown-light mb-2">Template Pesan</label>
-                  <textarea value={formMsg} onChange={e => setFormMsg(e.target.value)} rows={3} placeholder="Hai {nama}, jangan lupa..."
+                  <textarea value={formMsg} onChange={e => setFormMsg(e.target.value)} rows={4}
+                    placeholder="Hai {nama}, jangan lupa laporan hari ini ya!"
                     className="w-full px-4 py-3 rounded-xl border border-kimaya-cream-dark bg-kimaya-cream-light text-sm text-kimaya-brown placeholder-kimaya-brown-light/40 focus:outline-none focus:ring-2 focus:ring-kimaya-olive/30 resize-none" />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[
+                      { var: "{nama}", desc: "Nama karyawan" },
+                      { var: "{tanggal}", desc: "Tanggal hari ini" },
+                      { var: "{skor}", desc: "Skor performa" },
+                      { var: "{lokasi}", desc: "Lokasi cabang" },
+                    ].map(v => (
+                      <button key={v.var} type="button" onClick={() => setFormMsg(prev => prev + v.var)}
+                        className="text-[10px] px-2 py-0.5 rounded bg-kimaya-olive/10 text-kimaya-olive hover:bg-kimaya-olive/20 transition-colors"
+                        title={v.desc}>
+                        {v.var}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-kimaya-brown-light mb-2">Channel</label>
-                    <select value={formChannel} onChange={e => setFormChannel(e.target.value)}
+                    <label className="block text-sm font-medium text-kimaya-brown-light mb-2">Target</label>
+                    <select value={formTarget} onChange={e => setFormTarget(e.target.value)}
                       className="w-full px-3 py-3 rounded-xl border border-kimaya-cream-dark bg-kimaya-cream-light text-sm text-kimaya-brown focus:outline-none">
-                      {channels.map(c => <option key={c} value={c}>{channelLabels[c]}</option>)}
+                      {targetRoles.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
                   </div>
                   <div>
@@ -225,6 +286,79 @@ export default function RemindersPage() {
                   {saving ? <Loader2 size={16} className="animate-spin" /> : null}
                   {editing ? "Simpan Perubahan" : "Buat Reminder"}
                 </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Log Viewer Modal */}
+      <AnimatePresence>
+        {logReminderId && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setLogReminderId(null)}
+            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", damping: 25 }} onClick={e => e.stopPropagation()}
+              className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-serif text-kimaya-brown">Riwayat Pengiriman</h2>
+                <button onClick={() => setLogReminderId(null)} className="w-8 h-8 rounded-lg hover:bg-kimaya-cream flex items-center justify-center text-kimaya-brown-light/40"><XIcon size={18} /></button>
+              </div>
+
+              {/* Stats */}
+              {logStats && (
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  {[
+                    { label: "Terkirim", value: logStats.sent, cls: "text-blue-600 bg-blue-50" },
+                    { label: "Diterima", value: logStats.delivered, cls: "text-emerald-600 bg-emerald-50" },
+                    { label: "Dibaca", value: logStats.read, cls: "text-kimaya-olive bg-kimaya-olive/10" },
+                    { label: "Gagal", value: logStats.failed, cls: "text-red-500 bg-red-50" },
+                  ].map(s => (
+                    <div key={s.label} className={cn("rounded-xl p-3 text-center", s.cls)}>
+                      <p className="text-lg font-bold">{s.value}</p>
+                      <p className="text-[10px] font-medium opacity-70">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Log Table */}
+              <div className="flex-1 overflow-y-auto">
+                {logLoading ? (
+                  <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-kimaya-olive" /></div>
+                ) : logs.length === 0 ? (
+                  <div className="text-center py-12 text-kimaya-brown-light/40">
+                    <History size={32} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Belum ada riwayat pengiriman</p>
+                  </div>
+                ) : (
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-kimaya-cream-dark/30 bg-kimaya-cream/20">
+                        <th className="px-3 py-2.5 text-xs font-semibold text-kimaya-brown-light/50 text-left">Karyawan</th>
+                        <th className="px-3 py-2.5 text-xs font-semibold text-kimaya-brown-light/50 text-left">Telepon</th>
+                        <th className="px-3 py-2.5 text-xs font-semibold text-kimaya-brown-light/50 text-left">Status</th>
+                        <th className="px-3 py-2.5 text-xs font-semibold text-kimaya-brown-light/50 text-left">Waktu</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logs.map(log => {
+                        const badge = logStatusBadge[log.status] || logStatusBadge.SENT;
+                        return (
+                          <tr key={log.id} className="border-b border-kimaya-cream-dark/10 last:border-0">
+                            <td className="px-3 py-2.5 text-sm text-kimaya-brown">{log.userName}</td>
+                            <td className="px-3 py-2.5 text-xs text-kimaya-brown-light/50 font-mono">{log.phone}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={cn("text-[10px] font-medium px-2 py-0.5 rounded-full", badge.cls)}>{badge.label}</span>
+                              {log.error && <p className="text-[10px] text-red-400 mt-0.5 truncate max-w-[200px]" title={log.error}>{log.error}</p>}
+                            </td>
+                            <td className="px-3 py-2.5 text-xs text-kimaya-brown-light/40">{log.sentAt}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </motion.div>
           </motion.div>

@@ -259,7 +259,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-serif text-kimaya-brown mb-5">Aksi Cepat</h2>
           <div className="space-y-3">
             {[
-              { href: "/dashboard/attendance", icon: Clock, label: "Check-In Sekarang", desc: "Catat kehadiran hari ini", primary: true, roles: ["ADMIN", "THERAPIST"] },
+              { href: "/dashboard/attendance", icon: Clock, label: "Check-In Sekarang", desc: "Catat kehadiran hari ini", primary: true, roles: ["THERAPIST"] },
               { href: "/dashboard/reports", icon: Upload, label: "Upload Laporan", desc: "Kirim bukti laporan kerja" },
               { href: "/dashboard/scoring", icon: Star, label: "Lihat Skor", desc: "Cek performa karyawan" },
               { href: "/dashboard/reminders", icon: Bell, label: "Buat Reminder", desc: "Kirim pengingat via WhatsApp" },

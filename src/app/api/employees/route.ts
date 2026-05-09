@@ -6,23 +6,20 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
-    const dept = searchParams.get("dept") || "";
-    const loc = searchParams.get("loc") || "";
+    const role = searchParams.get("role") || "";
 
-    const where: Record<string, unknown> = { role: { in: ["THERAPIST", "DEVELOPER"] } };
+    const where: Record<string, unknown> = {};
     if (search) {
       where.OR = [
         { fullName: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
       ];
     }
-    if (dept) where.department = { name: dept };
-    if (loc) where.location = { name: loc };
+    if (role) where.role = role;
 
     const employees = await prisma.user.findMany({
       where,
       include: {
-        department: { select: { name: true } },
         location: { select: { name: true } },
       },
       orderBy: { fullName: "asc" },
@@ -33,7 +30,7 @@ export async function GET(request: Request) {
       name: e.fullName,
       email: e.email,
       phone: e.phone || "-",
-      dept: e.department?.name || "-",
+      role: e.role,
       location: e.location?.name || "-",
       status: e.status.toLowerCase(),
       joinDate: e.joinDate?.toISOString().split("T")[0] || "-",
@@ -52,7 +49,7 @@ const DEFAULT_PASSWORD = "kimaya2026";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, phone, departmentName, locationName } = body;
+    const { name, email, role, locationName } = body;
 
     if (!name || !email) {
       return NextResponse.json({ error: "Nama dan email wajib diisi" }, { status: 400 });
@@ -64,23 +61,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email sudah terdaftar" }, { status: 409 });
     }
 
-    const dept = departmentName ? await prisma.department.findFirst({ where: { name: departmentName } }) : null;
     const loc = locationName ? await prisma.location.findFirst({ where: { name: locationName } }) : null;
+
+    // Validate role
+    const validRoles = ["THERAPIST", "CS", "DEVELOPER"];
+    const userRole = validRoles.includes(role) ? role : "THERAPIST";
 
     // Hash default password
     const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
+
+    // Non-therapist roles skip onboarding (no face verification needed)
+    const needsOnboarding = userRole === "THERAPIST";
 
     const user = await prisma.user.create({
       data: {
         fullName: name,
         email: email.toLowerCase().trim(),
-        phone,
-        departmentId: dept?.id,
         locationId: loc?.id,
-        role: "THERAPIST",
+        role: userRole,
         status: "ACTIVE",
         passwordHash,
-        onboardingCompleted: false,
+        onboardingCompleted: !needsOnboarding,
       },
     });
 
@@ -93,4 +94,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Gagal menambahkan karyawan" }, { status: 500 });
   }
 }
-

@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     // Get employee list for selector
     const employees = await prisma.user.findMany({
       where: { role: "THERAPIST", status: { in: ["ACTIVE", "PROBATION"] } },
-      select: { id: true, fullName: true, phone: true, department: { select: { name: true } }, location: { select: { name: true } } },
+      select: { id: true, fullName: true, phone: true, avatarUrl: true, department: { select: { name: true } }, location: { select: { name: true } } },
       orderBy: { fullName: "asc" },
     });
 
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
       dept: e.department?.name || "-",
       location: e.location?.name || "-",
       avatar: e.fullName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(),
+      avatarUrl: e.avatarUrl,
     }));
 
     // If no userId selected, return just the employee list
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
     // Get user info
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, fullName: true, phone: true, department: { select: { name: true } }, location: { select: { name: true } } },
+      select: { id: true, fullName: true, phone: true, avatarUrl: true, department: { select: { name: true } }, location: { select: { name: true } } },
     });
 
     if (!user) {
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
         userId,
         date: { gte: startDate, lte: endDate },
       },
+      include: { shift: { select: { name: true } } },
       orderBy: { date: "asc" },
     });
 
@@ -59,6 +61,8 @@ export async function GET(request: Request) {
       date: a.date.toISOString().split("T")[0],
       day: a.date.getDate(),
       status: a.status,
+      isEarlyDeparture: a.isEarlyDeparture,
+      shiftName: a.shift?.name || "Default",
       checkInTime: a.checkInTime
         ? new Date(a.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
         : null,
@@ -70,6 +74,7 @@ export async function GET(request: Request) {
       checkOutLat: a.checkOutLat ? Number(a.checkOutLat) : null,
       checkOutLng: a.checkOutLng ? Number(a.checkOutLng) : null,
       selfieUrl: a.checkInSelfie || null,
+      checkOutSelfieUrl: a.checkOutSelfie || null,
       method: a.checkInMethod,
       notes: a.notes,
     }));
@@ -79,13 +84,17 @@ export async function GET(request: Request) {
     const late = attendances.filter(a => a.status === "LATE").length;
     const absent = attendances.filter(a => a.status === "ABSENT").length;
 
-    // Count working days in month (Mon-Fri, up to today)
+    // Determine working days based on Spa business logic
+    // Default: Mon-Sat (1-6), Sun(0) is off.
+    // We'll use a bitmask or array from config eventually.
+    const workingDaysMask = [1, 2, 3, 4, 5, 6]; // Mon-Sat
+    
     let workingDays = 0;
     const today = new Date(); today.setHours(23, 59, 59, 999);
     const checkDay = new Date(startDate);
     while (checkDay <= endDate && checkDay <= today) {
       const dow = checkDay.getDay();
-      if (dow > 0 && dow < 6) workingDays++;
+      if (workingDaysMask.includes(dow)) workingDays++;
       checkDay.setDate(checkDay.getDate() + 1);
     }
 
@@ -96,6 +105,7 @@ export async function GET(request: Request) {
         dept: user.department?.name || "-",
         location: user.location?.name || "-",
         avatar: user.fullName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(),
+        avatarUrl: user.avatarUrl,
       },
       month: monthStr,
       monthLabel: startDate.toLocaleDateString("id-ID", { month: "long", year: "numeric" }),

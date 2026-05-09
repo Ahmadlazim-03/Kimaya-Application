@@ -112,13 +112,6 @@ export default function ScoringPage() {
         <motion.div variants={item} className="lg:col-span-2 bg-white rounded-2xl border border-kimaya-cream-dark/30 overflow-hidden">
           <div className="px-6 py-4 border-b border-kimaya-cream-dark/20 flex items-center justify-between">
             <h2 className="text-lg font-serif text-kimaya-brown">Leaderboard</h2>
-            <div className="flex gap-2">
-              {scoreComponents.map(sc => (
-                <span key={sc.name} className="text-xs px-2 py-1 rounded-full bg-kimaya-cream text-kimaya-brown-light/60">
-                  {sc.emoji} {sc.weight}
-                </span>
-              ))}
-            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">

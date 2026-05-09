@@ -9,13 +9,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Employee { id: string; name: string; dept: string; location: string; avatar: string; }
+interface Employee { id: string; name: string; dept: string; location: string; avatar: string; avatarUrl?: string | null; }
 interface AttEntry {
   id: string; date: string; day: number; status: string;
   checkInTime: string | null; checkOutTime: string | null;
   checkInLat: number | null; checkInLng: number | null;
   checkOutLat: number | null; checkOutLng: number | null;
-  selfieUrl: string | null; method: string; notes: string | null;
+  selfieUrl: string | null; checkOutSelfieUrl?: string | null; method: string; notes: string | null;
+  shiftName?: string; isEarlyDeparture?: boolean;
 }
 interface Summary {
   employee: Employee; month: string; monthLabel: string;
@@ -142,10 +143,14 @@ export default function AttendanceCalendarPage() {
                         : "hover:bg-kimaya-cream/50 border border-transparent"
                     )}>
                     <div className={cn(
-                      "w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0",
+                      "w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 overflow-hidden",
                       selectedEmp === emp.id ? "bg-kimaya-olive text-white" : "bg-kimaya-cream text-kimaya-brown-light/60"
                     )}>
-                      {emp.avatar}
+                      {emp.avatarUrl ? (
+                        <img src={emp.avatarUrl} alt={emp.name} className="w-full h-full object-cover" />
+                      ) : (
+                        emp.avatar
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className={cn("text-sm font-medium truncate", selectedEmp === emp.id ? "text-kimaya-olive" : "text-kimaya-brown")}>{emp.name}</p>
@@ -166,8 +171,12 @@ export default function AttendanceCalendarPage() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               className="bg-white rounded-2xl border border-kimaya-cream-dark/30 p-4 space-y-3">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-kimaya-olive text-white flex items-center justify-center text-sm font-bold">
-                  {summary.employee.avatar}
+                <div className="w-10 h-10 rounded-full bg-kimaya-olive text-white flex items-center justify-center text-sm font-bold overflow-hidden">
+                  {summary.employee.avatarUrl ? (
+                    <img src={summary.employee.avatarUrl} alt={summary.employee.name} className="w-full h-full object-cover" />
+                  ) : (
+                    summary.employee.avatar
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-kimaya-brown">{summary.employee.name}</p>
@@ -346,7 +355,7 @@ export default function AttendanceCalendarPage() {
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               transition={{ type: "spring", damping: 25 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+              className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden"
             >
               {/* Modal Header */}
               <div className="bg-kimaya-brown px-6 py-4 flex items-center justify-between">
@@ -365,95 +374,134 @@ export default function AttendanceCalendarPage() {
                 </button>
               </div>
 
-              <div className="p-6 space-y-5">
-                {/* Employee Info */}
-                {summary && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-kimaya-olive text-white flex items-center justify-center text-sm font-bold">
-                      {summary.employee.avatar}
+              <div className="p-6 space-y-6">
+                {/* Employee Info & Status */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  {summary && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-kimaya-olive text-white flex items-center justify-center text-sm font-bold overflow-hidden shadow-sm">
+                        {summary.employee.avatarUrl ? (
+                          <img src={summary.employee.avatarUrl} alt={summary.employee.name} className="w-full h-full object-cover" />
+                        ) : (
+                          summary.employee.avatar
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-kimaya-brown">{summary.employee.name}</p>
+                        <p className="text-xs text-kimaya-brown-light/50">{summary.employee.dept} · {summary.employee.location}</p>
+                      </div>
                     </div>
+                  )}
+
+                  {(() => {
+                    const sc = statusConfig[selectedDay.status] || statusConfig.ABSENT;
+                    const Icon = sc.icon;
+                    return (
+                      <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full",
+                        selectedDay.status === "ON_TIME" ? "bg-emerald-50" :
+                        selectedDay.status === "LATE" ? "bg-amber-50" : "bg-red-50"
+                      )}>
+                        <Icon size={16} className={sc.color} />
+                        <span className={cn("text-sm font-semibold", sc.color)}>{sc.label}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Check-In Column */}
+                  <div className="space-y-4">
+                    <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100">
+                      <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-1">Check-In</p>
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-2xl font-mono font-bold text-kimaya-brown">
+                          {selectedDay.checkInTime || "—"}
+                        </p>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-1.5 text-[10px] text-kimaya-brown-light/60">
+                          <Shield size={10} /> <span>Metode: <strong className="text-kimaya-brown">{selectedDay.method}</strong></span>
+                        </div>
+                        {selectedDay.checkInLat !== null && selectedDay.checkInLng !== null && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-kimaya-brown-light/60">
+                            <Navigation size={10} className="text-kimaya-olive" />
+                            <a href={`https://maps.google.com/?q=${selectedDay.checkInLat},${selectedDay.checkInLng}`}
+                              target="_blank" rel="noopener noreferrer" className="hover:text-kimaya-olive font-medium underline">
+                              GPS: {Number(selectedDay.checkInLat).toFixed(5)}, {Number(selectedDay.checkInLng).toFixed(5)}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
-                      <p className="text-sm font-semibold text-kimaya-brown">{summary.employee.name}</p>
-                      <p className="text-xs text-kimaya-brown-light/50">{summary.employee.dept} · {summary.employee.location}</p>
+                      <p className="text-[10px] text-kimaya-brown-light/40 uppercase tracking-wider mb-2 flex items-center gap-1 font-semibold">
+                        <Camera size={10} /> Foto Check-In
+                      </p>
+                      {selectedDay.selfieUrl ? (
+                        <div className="rounded-xl overflow-hidden border border-kimaya-cream-dark/20 bg-kimaya-cream/10 shadow-sm aspect-video sm:aspect-auto">
+                          <img src={selectedDay.selfieUrl} alt="Foto Check-In" className="w-full h-40 object-cover hover:scale-105 transition-transform duration-500" />
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-40 rounded-xl bg-kimaya-cream/10 border border-dashed border-kimaya-cream-dark/20">
+                          <Camera size={24} className="text-kimaya-brown-light/10 mb-2" />
+                          <p className="text-[10px] text-kimaya-brown-light/30">Tidak ada foto</p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* Status Badge */}
-                {(() => {
-                  const sc = statusConfig[selectedDay.status] || statusConfig.ABSENT;
-                  const Icon = sc.icon;
-                  return (
-                    <div className={cn("flex items-center gap-2 px-4 py-3 rounded-xl",
-                      selectedDay.status === "ON_TIME" ? "bg-emerald-50" :
-                      selectedDay.status === "LATE" ? "bg-amber-50" : "bg-red-50"
-                    )}>
-                      <Icon size={18} className={sc.color} />
-                      <span className={cn("text-sm font-semibold", sc.color)}>{sc.label}</span>
+                  {/* Check-Out Column */}
+                  <div className="space-y-4">
+                    <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-100">
+                      <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wider mb-1">Check-Out</p>
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-2xl font-mono font-bold text-kimaya-brown">
+                          {selectedDay.checkOutTime || "—"}
+                        </p>
+                        {selectedDay.isEarlyDeparture && (
+                          <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded uppercase">Pulang Awal</span>
+                        )}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-1.5 text-[10px] text-kimaya-brown-light/60">
+                          <Shield size={10} /> <span>Shift: <strong className="text-kimaya-brown">{selectedDay.shiftName || 'Default'}</strong></span>
+                        </div>
+                        {selectedDay.checkOutLat !== null && selectedDay.checkOutLng !== null && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-kimaya-brown-light/60">
+                            <Navigation size={10} className="text-amber-600" />
+                            <a href={`https://maps.google.com/?q=${selectedDay.checkOutLat},${selectedDay.checkOutLng}`}
+                              target="_blank" rel="noopener noreferrer" className="hover:text-amber-600 font-medium underline">
+                              GPS: {Number(selectedDay.checkOutLat).toFixed(5)}, {Number(selectedDay.checkOutLng).toFixed(5)}
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  );
-                })()}
 
-                {/* Times */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl bg-kimaya-cream/30 border border-kimaya-cream-dark/10">
-                    <p className="text-[10px] text-kimaya-brown-light/40 uppercase tracking-wider mb-1">Check-In</p>
-                    <p className="text-lg font-mono font-semibold text-kimaya-brown">
-                      {selectedDay.checkInTime || "—"}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-kimaya-cream/30 border border-kimaya-cream-dark/10">
-                    <p className="text-[10px] text-kimaya-brown-light/40 uppercase tracking-wider mb-1">Check-Out</p>
-                    <p className="text-lg font-mono font-semibold text-kimaya-brown">
-                      {selectedDay.checkOutTime || "—"}
-                    </p>
+                    <div>
+                      <p className="text-[10px] text-kimaya-brown-light/40 uppercase tracking-wider mb-2 flex items-center gap-1 font-semibold">
+                        <Camera size={10} /> Foto Check-Out
+                      </p>
+                      {selectedDay.checkOutSelfieUrl ? (
+                        <div className="rounded-xl overflow-hidden border border-kimaya-cream-dark/20 bg-kimaya-cream/10 shadow-sm aspect-video sm:aspect-auto">
+                          <img src={selectedDay.checkOutSelfieUrl} alt="Foto Check-Out" className="w-full h-40 object-cover hover:scale-105 transition-transform duration-500" />
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-40 rounded-xl bg-kimaya-cream/10 border border-dashed border-kimaya-cream-dark/20">
+                          <Camera size={24} className="text-kimaya-brown-light/10 mb-2" />
+                          <p className="text-[10px] text-kimaya-brown-light/30">Tidak ada foto</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {/* Method & GPS */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-kimaya-brown-light/60">
-                    <Shield size={12} />
-                    <span>Metode: <strong className="text-kimaya-brown">{selectedDay.method}</strong></span>
-                  </div>
-                  {selectedDay.checkInLat && selectedDay.checkInLng && (
-                    <div className="flex items-center gap-2 text-xs text-kimaya-brown-light/60">
-                      <Navigation size={12} className="text-kimaya-olive" />
-                      <span>GPS: <strong className="text-kimaya-olive">{selectedDay.checkInLat.toFixed(5)}, {selectedDay.checkInLng.toFixed(5)}</strong></span>
-                    </div>
-                  )}
-                  {selectedDay.checkInLat && selectedDay.checkInLng && (
-                    <a href={`https://maps.google.com/?q=${selectedDay.checkInLat},${selectedDay.checkInLng}`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-kimaya-olive hover:text-kimaya-olive-dark font-medium">
-                      <MapPin size={11} /> Lihat di Google Maps →
-                    </a>
-                  )}
-                </div>
-
-                {/* Selfie Photo */}
-                {selectedDay.selfieUrl ? (
-                  <div>
-                    <p className="text-[10px] text-kimaya-brown-light/40 uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <Camera size={10} /> Foto Absensi
-                    </p>
-                    <div className="rounded-xl overflow-hidden border border-kimaya-cream-dark/20 bg-kimaya-cream/20">
-                      <img src={selectedDay.selfieUrl} alt="Selfie absensi"
-                        className="w-full h-48 object-cover" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6 rounded-xl bg-kimaya-cream/20 border border-dashed border-kimaya-cream-dark/20">
-                    <Camera size={28} className="text-kimaya-brown-light/20 mb-2" />
-                    <p className="text-xs text-kimaya-brown-light/30">Tidak ada foto absensi</p>
-                  </div>
-                )}
 
                 {/* Notes */}
                 {selectedDay.notes && (
                   <div className="p-3 rounded-xl bg-kimaya-cream/30 border border-kimaya-cream-dark/10">
-                    <p className="text-[10px] text-kimaya-brown-light/40 uppercase tracking-wider mb-1">Catatan</p>
-                    <p className="text-sm text-kimaya-brown">{selectedDay.notes}</p>
+                    <p className="text-[10px] text-kimaya-brown-light/40 uppercase tracking-wider mb-1 font-semibold">Catatan</p>
+                    <p className="text-sm text-kimaya-brown leading-relaxed">{selectedDay.notes}</p>
                   </div>
                 )}
               </div>

@@ -9,7 +9,7 @@ const EXPIRY = "8h";
 
 // ---- Types ----
 
-export type UserRole = "DEVELOPER" | "ADMIN" | "THERAPIST";
+export type UserRole = "DEVELOPER" | "MANAGER" | "CS" | "THERAPIST";
 
 export interface SessionUser {
   id: string;
@@ -26,14 +26,14 @@ export interface SessionUser {
 
 // Which roles can access which pages
 export const ROLE_PERMISSIONS: Record<string, UserRole[]> = {
-  "/dashboard":            ["DEVELOPER", "ADMIN", "THERAPIST"],
-  "/dashboard/attendance": ["DEVELOPER", "ADMIN", "THERAPIST"],
-  "/dashboard/attendance/calendar": ["DEVELOPER", "ADMIN"],
-  "/dashboard/reports":    ["DEVELOPER", "ADMIN", "THERAPIST"],
-  "/dashboard/scoring":    ["DEVELOPER", "ADMIN"],
-  "/dashboard/reminders":  ["DEVELOPER", "ADMIN"],
-  "/dashboard/employees":  ["DEVELOPER", "ADMIN"],
-  "/dashboard/settings":   ["DEVELOPER", "ADMIN"],
+  "/dashboard":            ["DEVELOPER", "MANAGER", "CS", "THERAPIST"],
+  "/dashboard/attendance": ["MANAGER", "CS", "THERAPIST"],
+  "/dashboard/attendance/calendar": ["DEVELOPER", "MANAGER", "CS"],
+  "/dashboard/reports":    ["DEVELOPER", "MANAGER", "CS", "THERAPIST"],
+  "/dashboard/scoring":    ["DEVELOPER", "MANAGER", "CS"],
+  "/dashboard/reminders":  ["DEVELOPER", "MANAGER", "CS"],
+  "/dashboard/employees":  ["DEVELOPER", "MANAGER", "CS"],
+  "/dashboard/settings":   ["DEVELOPER", "MANAGER"],
 };
 
 // Menu items visible per role
@@ -46,13 +46,13 @@ export interface MenuItem {
 }
 
 export const MENU_ITEMS: MenuItem[] = [
-  { label: "Dashboard",   href: "/dashboard",            icon: "LayoutDashboard", section: "main",  roles: ["DEVELOPER", "ADMIN", "THERAPIST"] },
-  { label: "Absensi",     href: "/dashboard/attendance",  icon: "Clock",           section: "main",  roles: ["DEVELOPER", "ADMIN", "THERAPIST"] },
-  { label: "Laporan",     href: "/dashboard/reports",     icon: "FileText",        section: "main",  roles: ["DEVELOPER", "ADMIN", "THERAPIST"] },
-  { label: "Skoring",     href: "/dashboard/scoring",     icon: "Star",            section: "main",  roles: ["DEVELOPER", "ADMIN"] },
-  { label: "Reminder",    href: "/dashboard/reminders",   icon: "Bell",            section: "main",  roles: ["DEVELOPER", "ADMIN"] },
-  { label: "Karyawan",    href: "/dashboard/employees",   icon: "Users",           section: "admin", roles: ["DEVELOPER", "ADMIN"] },
-  { label: "Pengaturan",  href: "/dashboard/settings",    icon: "Settings",        section: "admin", roles: ["DEVELOPER", "ADMIN"] },
+  { label: "Dashboard",   href: "/dashboard",            icon: "LayoutDashboard", section: "main",  roles: ["DEVELOPER", "MANAGER", "CS", "THERAPIST"] },
+  { label: "Absensi",     href: "/dashboard/attendance",  icon: "Clock",           section: "main",  roles: ["MANAGER", "CS", "THERAPIST"] },
+  { label: "Laporan",     href: "/dashboard/reports",     icon: "FileText",        section: "main",  roles: ["DEVELOPER", "MANAGER", "CS", "THERAPIST"] },
+  { label: "Skoring",     href: "/dashboard/scoring",     icon: "Star",            section: "main",  roles: ["DEVELOPER", "MANAGER", "CS"] },
+  { label: "Reminder",    href: "/dashboard/reminders",   icon: "Bell",            section: "main",  roles: ["DEVELOPER", "MANAGER", "CS"] },
+  { label: "Karyawan",    href: "/dashboard/employees",   icon: "Users",           section: "admin", roles: ["DEVELOPER", "MANAGER", "CS"] },
+  { label: "Pengaturan",  href: "/dashboard/settings",    icon: "Settings",        section: "admin", roles: ["DEVELOPER", "MANAGER"] },
 ];
 
 export function getMenuForRole(role: UserRole): MenuItem[] {
@@ -71,7 +71,8 @@ export function canAccess(role: UserRole, path: string): boolean {
 export function getRoleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     DEVELOPER: "Developer",
-    ADMIN: "Admin",
+    MANAGER: "Manager",
+    CS: "Customer Service",
     THERAPIST: "Therapist",
   };
   return labels[role] || role;

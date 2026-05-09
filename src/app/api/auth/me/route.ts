@@ -23,6 +23,14 @@ export async function GET() {
         phone: true,
         address: true,
         onboardingCompleted: true,
+        shift: {
+          select: {
+            id: true,
+            name: true,
+            startTime: true,
+            endTime: true,
+          }
+        }
       },
     });
 
@@ -32,7 +40,7 @@ export async function GET() {
 
     return NextResponse.json({
       user,
-      needsOnboarding: user.role === "DEVELOPER" ? false : !user.onboardingCompleted,
+      needsOnboarding: user.role === "THERAPIST" ? !user.onboardingCompleted : false,
     });
   } catch {
     return NextResponse.json({ error: "Session tidak valid" }, { status: 401 });

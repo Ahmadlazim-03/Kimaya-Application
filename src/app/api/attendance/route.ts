@@ -12,12 +12,12 @@ export async function GET(request: Request) {
     const [attendances, leaveRequests, totalEmployees] = await Promise.all([
       prisma.attendance.findMany({
         where: { date },
-        include: { user: { select: { fullName: true, department: { select: { name: true } }, location: { select: { name: true } } } } },
+        include: { user: { select: { fullName: true, avatarUrl: true, department: { select: { name: true } }, location: { select: { name: true } } } } },
         orderBy: { checkInTime: "asc" },
       }),
       prisma.leaveRequest.findMany({
         where: { status: { in: ["PENDING", "APPROVED"] }, startDate: { lte: date }, endDate: { gte: date } },
-        include: { user: { select: { fullName: true } }, approvedBy: { select: { fullName: true } } },
+        include: { user: { select: { fullName: true, avatarUrl: true } }, approvedBy: { select: { fullName: true } } },
         orderBy: { createdAt: "desc" },
       }),
       prisma.user.count({ where: { role: "THERAPIST", status: { in: ["ACTIVE", "PROBATION"] } } }),
@@ -35,6 +35,7 @@ export async function GET(request: Request) {
       gpsVerified: !!(a.checkInLat && a.checkInLng),
       distance: null as number | null,
       avatar: a.user.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+      avatarUrl: a.user.avatarUrl,
     }));
 
     const leaves = leaveRequests.map((lr) => ({
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
       to: lr.endDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" }),
       status: lr.status.toLowerCase(),
       avatar: lr.user.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+      avatarUrl: lr.user.avatarUrl,
     }));
 
     const present = attendances.filter((a) => a.status === "ON_TIME" || a.status === "LATE").length;
@@ -89,9 +91,9 @@ export async function POST(request: Request) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const now = new Date();
 
-    // ── Face verification for check-in (non-ADMIN & non-DEVELOPER only) ──
+    // ── Face verification for check-in (THERAPIST only) ──
     let faceMatchScore: number | null = null;
-    if (action === "checkin" && session.role !== "ADMIN" && session.role !== "DEVELOPER") {
+    if (action === "checkin" && session.role === "THERAPIST") {
       // Validate user has registered face
       const userFace = await prisma.user.findUnique({
         where: { id: userId },
@@ -124,30 +126,87 @@ export async function POST(request: Request) {
       faceMatchScore = tokenData.matchScore;
     }
 
-    // Get user's assigned location for GPS validation
+    // Get user's assigned location and SHIFT for GPS/Time validation
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { location: true },
+      include: { location: true, shift: true },
     });
 
     let gpsValid = false;
     let distance = 0;
-    const gpsRadius = user?.location?.geofenceRadiusM || 100;
+    let gpsRadius = user?.location?.geofenceRadiusM || 100;
+    let targetLocationName = user?.location?.name || "Belum ditentukan";
 
-    if (latitude && longitude && user?.location?.latitude && user?.location?.longitude) {
-      const officeLat = Number(user.location.latitude);
-      const officeLng = Number(user.location.longitude);
-      distance = calcDistance(latitude, longitude, officeLat, officeLng);
-      gpsValid = distance <= gpsRadius;
+    if (latitude && longitude) {
+      if (user?.location?.latitude && user?.location?.longitude) {
+        const officeLat = Number(user.location.latitude);
+        const officeLng = Number(user.location.longitude);
+        distance = calcDistance(latitude, longitude, officeLat, officeLng);
+        gpsValid = distance <= gpsRadius;
+      } else {
+        // User has no location assigned, check all available locations (Roaming support)
+        const allLocations = await prisma.location.findMany();
+        let nearestLoc = null;
+        let minDistance = Infinity;
+
+        for (const loc of allLocations) {
+          if (loc.latitude && loc.longitude) {
+            const d = calcDistance(latitude, longitude, Number(loc.latitude), Number(loc.longitude));
+            if (d < minDistance) {
+              minDistance = d;
+              nearestLoc = loc;
+            }
+            if (d <= loc.geofenceRadiusM) {
+              gpsValid = true;
+              distance = d;
+              gpsRadius = loc.geofenceRadiusM;
+              targetLocationName = loc.name;
+              
+              // If roaming, we don't necessarily update locationId permanently, 
+              // but for this record it's valid. 
+              // (Optional: update user if it was null)
+              if (!user?.locationId) {
+                await prisma.user.update({
+                  where: { id: userId },
+                  data: { locationId: loc.id }
+                });
+              }
+              break;
+            }
+          }
+        }
+
+        if (!gpsValid && nearestLoc) {
+          distance = minDistance;
+          gpsRadius = nearestLoc.geofenceRadiusM;
+          targetLocationName = nearestLoc.name;
+        }
+      }
     }
 
-    // Determine check-in time config
+    // Determine check-in/out time based on SHIFT or Global Config
     const configRow = await prisma.systemConfig.findUnique({ where: { key: "late_tolerance_minutes" } });
     const tolerance = parseInt(configRow?.value || "10");
-    const checkInConfig = await prisma.systemConfig.findUnique({ where: { key: "default_check_in_time" } });
-    const [h, m] = (checkInConfig?.value || "08:00").split(":").map(Number);
+
+    // Use User's Shift if available, else fallback to global config
+    let shiftStartTime = "08:00";
+    let shiftEndTime = "17:00";
+
+    if (user?.shift) {
+      shiftStartTime = user.shift.startTime;
+      shiftEndTime = user.shift.endTime;
+    } else {
+      const globalStart = await prisma.systemConfig.findUnique({ where: { key: "default_check_in_time" } });
+      if (globalStart) shiftStartTime = globalStart.value;
+    }
+
+    const [sh, sm] = shiftStartTime.split(":").map(Number);
     const checkInDeadline = new Date(today);
-    checkInDeadline.setHours(h, m + tolerance, 0, 0);
+    checkInDeadline.setHours(sh, sm + tolerance, 0, 0);
+
+    const [eh, em] = shiftEndTime.split(":").map(Number);
+    const checkOutStandard = new Date(today);
+    checkOutStandard.setHours(eh, em, 0, 0);
 
     if (action === "checkin") {
       const status = now > checkInDeadline ? "LATE" : "ON_TIME";
@@ -155,19 +214,21 @@ export async function POST(request: Request) {
         where: { userId_date: { userId, date: today } },
         create: {
           userId, date: today, checkInTime: now, status,
+          shiftId: user?.shiftId,
           checkInLat: latitude || null, checkInLng: longitude || null,
           checkInMethod: latitude ? "GPS_FACE" : "WEB_FACE",
           checkInSelfie: selfiePhoto || null,
         },
         update: {
           checkInTime: now, status,
+          shiftId: user?.shiftId,
           checkInLat: latitude || null, checkInLng: longitude || null,
           checkInMethod: latitude ? "GPS_FACE" : "WEB_FACE",
           checkInSelfie: selfiePhoto || null,
         },
       });
 
-      // ── Audit log with face match score ──
+      // ── Audit log with shift info ──
       await prisma.auditLog.create({
         data: {
           userId,
@@ -176,11 +237,12 @@ export async function POST(request: Request) {
           entityId: att.id,
           details: {
             status: att.status,
+            shiftName: user?.shift?.name || "Default",
             faceMatchScore,
             gpsValid,
             distance: Math.round(distance),
+            locationName: targetLocationName,
             method: latitude ? "GPS_FACE" : "WEB_FACE",
-            checkInTime: now.toISOString(),
           },
         },
       });
@@ -189,21 +251,57 @@ export async function POST(request: Request) {
         id: att.id, status: att.status,
         gpsValid, distance: Math.round(distance),
         gpsRadius, faceMatchScore,
+        locationName: targetLocationName,
         message: gpsValid
-          ? `✅ Check-in berhasil! Wajah ✓ (${faceMatchScore || '-'}%) • GPS ✓ (${Math.round(distance)}m)`
+          ? `✅ Check-in berhasil! Wajah ✓ • GPS ✓ (${targetLocationName}) • Shift: ${user?.shift?.name || 'Default'}`
           : latitude
-            ? `⚠️ Check-in berhasil! Wajah ✓ • GPS di luar radius (${Math.round(distance)}m / max ${gpsRadius}m)`
-            : `✅ Check-in berhasil! Wajah ✓ (${faceMatchScore || '-'}%)`,
+            ? `⚠️ Check-in berhasil! Wajah ✓ • GPS di luar radius (${Math.round(distance)}m dari ${targetLocationName})`
+            : `✅ Check-in berhasil! Wajah ✓`,
       });
     } else {
+      // Check-out: Handle early departure
+      const isEarly = now < checkOutStandard;
+
+      // Therapist face verification (same as check-in)
+      if (session.role === "THERAPIST") {
+        if (!faceVerifyToken) return NextResponse.json({ error: "Token verifikasi wajah diperlukan." }, { status: 403 });
+        const tokenData = await verifyFaceToken(faceVerifyToken, userId, selfiePhoto);
+        if (!tokenData) return NextResponse.json({ error: "Token tidak valid." }, { status: 403 });
+        faceMatchScore = tokenData.matchScore;
+      }
+
       const att = await prisma.attendance.update({
         where: { userId_date: { userId, date: today } },
         data: {
           checkOutTime: now,
           checkOutLat: latitude || null, checkOutLng: longitude || null,
+          checkOutSelfie: selfiePhoto || null,
+          isEarlyDeparture: isEarly,
         },
       });
-      return NextResponse.json({ id: att.id, message: "✅ Check-out berhasil!" });
+
+      // Audit log
+      await prisma.auditLog.create({
+        data: {
+          userId,
+          action: "CHECK_OUT",
+          entityType: "Attendance",
+          entityId: att.id,
+          details: {
+            isEarlyDeparture: isEarly,
+            shiftEndTime,
+            checkOutTime: now.toISOString(),
+          },
+        },
+      });
+
+      return NextResponse.json({ 
+        id: att.id, 
+        isEarly,
+        message: isEarly 
+          ? "⚠️ Check-out berhasil! (Peringatan: Pulang lebih awal dari jadwal shift)" 
+          : "✅ Check-out berhasil! Sampai jumpa besok." 
+      });
     }
   } catch (error) {
     console.error("Attendance POST error:", error);

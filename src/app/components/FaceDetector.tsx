@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, RefreshCw, Check, AlertTriangle, Loader2, ScanFace, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { warmUpFaceMatcher } from "@/lib/faceMatch";
 import {
   type ChallengeConfig,
   getRegistrationChallenges,
@@ -123,6 +124,9 @@ export default function FaceDetector({
 
       setStatus("ready");
       setStatusMessage("Posisikan wajah Anda di dalam frame");
+      if (mode === "attendance") {
+        void warmUpFaceMatcher();
+      }
       startLoop();
     } catch (err) {
       console.error("Init error:", err);

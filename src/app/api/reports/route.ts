@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { notifyReportSubmitted, notifyReportReviewed } from "@/lib/notifications";
 
 export async function GET(request: Request) {
   try {
@@ -111,6 +112,12 @@ export async function POST(request: Request) {
       },
     });
 
+    // Send WhatsApp notification to Manager/CS (fire & forget)
+    const reporter = await prisma.user.findUnique({ where: { id: userId }, select: { fullName: true } });
+    if (reporter) {
+      notifyReportSubmitted(report.id, reporter.fullName, report.title).catch(() => {});
+    }
+
     return NextResponse.json({
       id: report.id,
       cleanlinessScore,
@@ -130,10 +137,16 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
     const { id, status } = body;
-    await prisma.report.update({
+    const report = await prisma.report.update({
       where: { id },
       data: { status, reviewedAt: new Date() },
     });
+
+    // Notify therapist about review result (fire & forget)
+    if (status === "APPROVED" || status === "REVISION_REQUIRED") {
+      notifyReportReviewed(report.userId, report.title, status).catch(() => {});
+    }
+
     return NextResponse.json({ message: "Laporan berhasil diupdate" });
   } catch (error) {
     console.error("Reports PUT error:", error);

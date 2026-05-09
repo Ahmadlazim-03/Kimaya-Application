@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
-export type UserRole = "DEVELOPER" | "ADMIN" | "THERAPIST";
+export type UserRole = "DEVELOPER" | "MANAGER" | "CS" | "THERAPIST";
 
 export interface AuthUser {
   id: string;
@@ -17,6 +17,12 @@ export interface AuthUser {
   phone?: string;
   address?: string;
   onboardingCompleted?: boolean;
+  shift?: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+  } | null;
 }
 
 interface AuthContextType {
@@ -27,20 +33,25 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isDeveloper: boolean;
+  isManager: boolean;
+  isCS: boolean;
   isAdmin: boolean;
   isTherapist: boolean;
   canAccess: (path: string) => boolean;
 }
 
 const ROLE_PAGES: Record<string, UserRole[]> = {
-  "/dashboard":            ["DEVELOPER", "ADMIN", "THERAPIST"],
-  "/dashboard/attendance": ["DEVELOPER", "ADMIN", "THERAPIST"],
-  "/dashboard/attendance/calendar": ["DEVELOPER", "ADMIN"],
-  "/dashboard/reports":    ["DEVELOPER", "ADMIN", "THERAPIST"],
-  "/dashboard/scoring":    ["DEVELOPER", "ADMIN"],
-  "/dashboard/reminders":  ["DEVELOPER", "ADMIN"],
-  "/dashboard/employees":  ["DEVELOPER", "ADMIN"],
-  "/dashboard/settings":   ["DEVELOPER", "ADMIN"],
+  "/dashboard":            ["DEVELOPER", "MANAGER", "CS", "THERAPIST"],
+  "/dashboard/attendance": ["MANAGER", "CS", "THERAPIST"],
+  "/dashboard/attendance/calendar": ["MANAGER", "CS"],
+  "/dashboard/reports":    ["MANAGER", "CS", "THERAPIST"],
+  "/dashboard/scoring":    ["MANAGER", "CS"],
+  "/dashboard/reminders":  ["MANAGER", "CS"],
+  "/dashboard/employees":  ["DEVELOPER", "MANAGER", "CS"],
+  "/dashboard/settings":   ["DEVELOPER", "MANAGER"],
+  "/dashboard/locations":  ["DEVELOPER", "MANAGER"],
+  "/dashboard/monitoring": ["DEVELOPER", "MANAGER"],
+  "/dashboard/leaves":     ["DEVELOPER", "MANAGER", "CS", "THERAPIST"],
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -139,11 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isDeveloper = user?.role === "DEVELOPER";
-  const isAdmin = user?.role === "ADMIN" || isDeveloper;
+  const isManager = user?.role === "MANAGER";
+  const isCS = user?.role === "CS";
+  const isAdmin = isDeveloper || isManager; // admin-level access
   const isTherapist = user?.role === "THERAPIST";
 
   return (
-    <AuthContext.Provider value={{ user, loading, needsOnboarding, login, logout, refreshUser, isDeveloper, isAdmin, isTherapist, canAccess }}>
+    <AuthContext.Provider value={{ user, loading, needsOnboarding, login, logout, refreshUser, isDeveloper, isManager, isCS, isAdmin, isTherapist, canAccess }}>
       {children}
     </AuthContext.Provider>
   );

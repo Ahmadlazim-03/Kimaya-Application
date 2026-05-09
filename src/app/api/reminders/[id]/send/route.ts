@@ -8,22 +8,56 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const reminder = await prisma.reminder.findUnique({ where: { id } });
     if (!reminder) return NextResponse.json({ error: "Reminder tidak ditemukan" }, { status: 404 });
 
-    // Get all active employees
+    // Build employee filter based on targetRole
+    const whereClause: Record<string, unknown> = {
+      status: { in: ["ACTIVE", "PROBATION"] },
+      phone: { not: null },
+    };
+
+    // If reminder targets a specific role, filter by that role
+    if (reminder.targetRole) {
+      whereClause.role = reminder.targetRole;
+    } else {
+      // Default: send to all THERAPISTs
+      whereClause.role = "THERAPIST";
+    }
+
+    // If targeting a specific user
+    if (reminder.targetUserId) {
+      whereClause.id = reminder.targetUserId;
+    }
+
     const employees = await prisma.user.findMany({
-      where: { role: "THERAPIST", status: { in: ["ACTIVE", "PROBATION"] }, phone: { not: null } },
-      include: { scores: { orderBy: { periodDate: "desc" }, take: 1 } },
+      where: whereClause,
+      include: {
+        scores: { orderBy: { periodDate: "desc" }, take: 1 },
+        location: { select: { name: true } },
+      },
     });
 
+    if (employees.length === 0) {
+      return NextResponse.json({
+        message: "Tidak ada karyawan dengan nomor telepon yang terdaftar",
+        results: [],
+      });
+    }
+
     const results: { name: string; phone: string; success: boolean; error?: string }[] = [];
+    const today = new Date().toLocaleDateString("id-ID", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    });
 
     for (const emp of employees) {
       if (!emp.phone) continue;
       try {
         const score = emp.scores[0]?.totalScore?.toString() || "-";
+        const location = emp.location?.name || "-";
+
         await sendReminder(emp.phone, reminder.messageTemplate, {
           nama: emp.fullName,
           skor: score,
-          tanggal: new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+          tanggal: today,
+          lokasi: location,
         });
 
         // Log the sent reminder
@@ -53,6 +87,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
   } catch (error) {
     console.error("Send reminder error:", error);
-    return NextResponse.json({ error: "Gagal mengirim reminder" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : "Gagal mengirim reminder";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

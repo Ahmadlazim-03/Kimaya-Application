@@ -6,13 +6,13 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Clock, FileText, Star, Bell, Users, Settings,
-  ChevronLeft, LogOut, Droplets, X, Shield,
+  ChevronLeft, LogOut, Droplets, X, Shield, MapPin, Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, type UserRole } from "@/lib/AuthContext";
 
 const iconMap: Record<string, typeof LayoutDashboard> = {
-  LayoutDashboard, Clock, FileText, Star, Bell, Users, Settings,
+  LayoutDashboard, Clock, FileText, Star, Bell, Users, Settings, MapPin, Activity,
 };
 
 interface NavDef {
@@ -24,24 +24,29 @@ interface NavDef {
 }
 
 const allNavItems: NavDef[] = [
-  { label: "Dashboard",  href: "/dashboard",            icon: "LayoutDashboard", section: "main",  roles: ["DEVELOPER", "ADMIN", "THERAPIST"] },
-  { label: "Absensi",    href: "/dashboard/attendance",  icon: "Clock",           section: "main",  roles: ["ADMIN", "THERAPIST"] },
-  { label: "Laporan",    href: "/dashboard/reports",     icon: "FileText",        section: "main",  roles: ["DEVELOPER", "ADMIN", "THERAPIST"] },
-  { label: "Skoring",    href: "/dashboard/scoring",     icon: "Star",            section: "main",  roles: ["DEVELOPER", "ADMIN"] },
-  { label: "Reminder",   href: "/dashboard/reminders",   icon: "Bell",            section: "main",  roles: ["DEVELOPER", "ADMIN"] },
-  { label: "Karyawan",   href: "/dashboard/employees",   icon: "Users",           section: "admin", roles: ["DEVELOPER", "ADMIN"] },
-  { label: "Pengaturan", href: "/dashboard/settings",    icon: "Settings",        section: "admin", roles: ["DEVELOPER", "ADMIN"] },
+  { label: "Dashboard",  href: "/dashboard",            icon: "LayoutDashboard", section: "main",  roles: ["DEVELOPER", "MANAGER", "CS", "THERAPIST"] },
+  { label: "Absensi",    href: "/dashboard/attendance",  icon: "Clock",           section: "main",  roles: ["MANAGER", "CS", "THERAPIST"] },
+  { label: "Laporan",    href: "/dashboard/reports",     icon: "FileText",        section: "main",  roles: ["MANAGER", "CS", "THERAPIST"] },
+  { label: "Skoring",    href: "/dashboard/scoring",     icon: "Star",            section: "main",  roles: ["MANAGER", "CS"] },
+  { label: "Reminder",   href: "/dashboard/reminders",   icon: "Bell",            section: "main",  roles: ["MANAGER", "CS"] },
+  { label: "Pengajuan Cuti", href: "/dashboard/leaves",  icon: "Calendar",        section: "main",  roles: ["DEVELOPER", "MANAGER", "CS", "THERAPIST"] },
+  { label: "Lokasi",     href: "/dashboard/locations",   icon: "MapPin",          section: "admin", roles: ["DEVELOPER", "MANAGER"] },
+  { label: "Monitoring", href: "/dashboard/monitoring",  icon: "Activity",        section: "admin", roles: ["DEVELOPER", "MANAGER"] },
+  { label: "Karyawan",   href: "/dashboard/employees",   icon: "Users",           section: "admin", roles: ["DEVELOPER", "MANAGER", "CS"] },
+  { label: "Pengaturan", href: "/dashboard/settings",    icon: "Settings",        section: "admin", roles: ["DEVELOPER", "MANAGER"] },
 ];
 
 const roleLabels: Record<UserRole, string> = {
   DEVELOPER: "Developer",
-  ADMIN: "Admin",
+  MANAGER: "Manager",
+  CS: "Customer Service",
   THERAPIST: "Therapist",
 };
 
 const roleBadgeColors: Record<UserRole, string> = {
   DEVELOPER: "bg-blue-500/20 text-blue-300",
-  ADMIN: "bg-kimaya-olive/30 text-kimaya-gold",
+  MANAGER: "bg-purple-500/20 text-purple-300",
+  CS: "bg-kimaya-olive/30 text-kimaya-gold",
   THERAPIST: "bg-kimaya-cream/20 text-kimaya-cream/60",
 };
 

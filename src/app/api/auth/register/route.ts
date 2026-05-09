@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createSession, setSessionCookie } from "@/lib/auth";
+import { createSession, setSessionCookie, SessionUser, UserRole } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
 const BCRYPT_ROUNDS = 12;
@@ -59,10 +59,22 @@ export async function POST(request: Request) {
     });
 
     if (existing) {
-      return NextResponse.json(
-        { error: "Email sudah terdaftar. Silakan login." },
-        { status: 409 }
-      );
+      // If the old account was deactivated/terminated, remove it so the user can re-register
+      if (existing.status === "TERMINATED" || existing.status === "INACTIVE") {
+        await prisma.$transaction(async (tx) => {
+          await tx.leaveRequest.updateMany({ where: { approvedById: existing.id }, data: { approvedById: null } });
+          await tx.report.updateMany({ where: { reviewedById: existing.id }, data: { reviewedById: null } });
+          await tx.attendance.updateMany({ where: { approvedById: existing.id }, data: { approvedById: null } });
+          await tx.reminder.updateMany({ where: { createdById: existing.id }, data: { createdById: null } });
+          await tx.initiativePoint.deleteMany({ where: { givenById: existing.id } });
+          await tx.user.delete({ where: { id: existing.id } });
+        });
+      } else {
+        return NextResponse.json(
+          { error: "Email sudah terdaftar. Silakan login." },
+          { status: 409 }
+        );
+      }
     }
 
     // ── Create user with face photo ──
@@ -75,17 +87,19 @@ export async function POST(request: Request) {
         phone: phone?.trim() || null,
         passwordHash: hashedPassword,
         facePhotoUrl: facePhoto,
+        avatarUrl: facePhoto,
         role: "THERAPIST",
         status: "ACTIVE",
+        onboardingCompleted: true,
       },
     });
 
     // ── Auto-login after registration ──
-    const sessionUser = {
+    const sessionUser: SessionUser = {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
-      role: user.role,
+      role: user.role as UserRole,
       departmentId: undefined,
       locationId: undefined,
       avatarUrl: undefined,

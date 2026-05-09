@@ -111,7 +111,11 @@ export async function sendFile(
  * e.g. "+6281234567890" → "6281234567890@c.us"
  */
 export function phoneToWaChatId(phone: string): string {
-  const cleaned = phone.replace(/[^0-9]/g, "");
+  let cleaned = phone.replace(/[^0-9]/g, "");
+  // Jika dimulai dengan 0, ubah jadi 62 (Indonesia)
+  if (cleaned.startsWith("0")) {
+    cleaned = "62" + cleaned.substring(1);
+  }
   return `${cleaned}@c.us`;
 }
 

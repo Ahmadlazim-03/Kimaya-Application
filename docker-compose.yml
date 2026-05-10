@@ -1,120 +1,155 @@
-# ============================================
-# SIYAP — Docker Compose
-# Kimaya Experience Employee Management Platform
-# ============================================
-# Services:
-#   1. siyap-app    → Next.js Frontend (port 3000)
-#   2. waha         → WhatsApp HTTP API NoWeb (port 3001)
-#   3. postgres     → PostgreSQL 16 Database (port 5432)
-#   4. redis        → Redis 7 Cache & Queue (port 6379)
-# ============================================
-
 services:
-  # ---- PostgreSQL 16 ----
   postgres:
-    image: postgres:16-alpine
-    container_name: siyap-postgres
+    image: 'postgres:16-alpine'
+    container_name: postgres-kkizq7m30dww6cdrl8xxfajq-204751595415
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DATABASE_NAME:-siyap_db}
-      POSTGRES_USER: ${DATABASE_USER:-siyap_admin}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-SiyapKimaya2026!}
+      POSTGRES_DB: '${DATABASE_NAME:-siyap_db}'
+      POSTGRES_USER: '${DATABASE_USER:-siyap_admin}'
+      POSTGRES_PASSWORD: '${DATABASE_PASSWORD:-SiyapKimaya2026!}'
       PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
+      DATABASE_NAME: siyap_db
+      DATABASE_USER: siyap_admin
+      DATABASE_PASSWORD: SiyapKimaya2026!
+      COOLIFY_BRANCH: '"main"'
+      COOLIFY_RESOURCE_UUID: kkizq7m30dww6cdrl8xxfajq
+      COOLIFY_CONTAINER_NAME: postgres-kkizq7m30dww6cdrl8xxfajq-204751595415
+      SERVICE_NAME_POSTGRES: postgres
+      SERVICE_NAME_REDIS: redis
+      SERVICE_NAME_WAHA: waha
+      SERVICE_NAME_SIYAP_APP: siyap-app
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      # NOTE: init.sql intentionally NOT mounted. Schema is owned by Prisma
-      # (`prisma db push` in entrypoint.sh), seed data by prisma/seed.js.
-      # Mounting init.sql would duplicate / conflict with Prisma's view of the
-      # schema and made postgres init fail on fresh Coolify volumes.
+      - 'kkizq7m30dww6cdrl8xxfajq_postgres-data:/var/lib/postgresql/data'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-siyap_admin} -d ${DATABASE_NAME:-siyap_db}"]
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${DATABASE_USER:-siyap_admin} -d ${DATABASE_NAME:-siyap_db}'
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 60s
     networks:
-      - siyap-network
-
-  # ---- Redis 7 ----
+      siyap-network: null
+      kkizq7m30dww6cdrl8xxfajq: null
+    labels:
+      - coolify.managed=true
+      - coolify.version=4.0.0
+      - coolify.applicationId=1
+      - coolify.type=application
+      - coolify.name=postgres-kkizq7m30dww6cdrl8xxfajq-204751595415
+      - coolify.resourceName=kimaya-applicationmain-ka4a0uma4xn32n9sc2j7qh14
+      - coolify.projectName=kimaya
+      - coolify.serviceName=kimaya-applicationmain-ka4a0uma4xn32n9sc2j7qh14
+      - coolify.environmentName=production
+      - coolify.pullRequestId=0
+    env_file:
+      - .env
   redis:
-    image: redis:7-alpine
-    container_name: siyap-redis
+    image: 'redis:7-alpine'
+    container_name: redis-kkizq7m30dww6cdrl8xxfajq-204751616619
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
+    command: 'redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru'
     volumes:
-      - redis_data:/data
+      - 'kkizq7m30dww6cdrl8xxfajq_redis-data:/data'
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        - CMD
+        - redis-cli
+        - ping
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - siyap-network
-
-  # ---- WAHA (WhatsApp HTTP API — NoWeb Engine) ----
+      siyap-network: null
+      kkizq7m30dww6cdrl8xxfajq: null
+    labels:
+      - coolify.managed=true
+      - coolify.version=4.0.0
+      - coolify.applicationId=1
+      - coolify.type=application
+      - coolify.name=redis-kkizq7m30dww6cdrl8xxfajq-204751616619
+      - coolify.resourceName=kimaya-applicationmain-ka4a0uma4xn32n9sc2j7qh14
+      - coolify.projectName=kimaya
+      - coolify.serviceName=kimaya-applicationmain-ka4a0uma4xn32n9sc2j7qh14
+      - coolify.environmentName=production
+      - coolify.pullRequestId=0
+    environment:
+      COOLIFY_BRANCH: '"main"'
+      COOLIFY_RESOURCE_UUID: kkizq7m30dww6cdrl8xxfajq
+      COOLIFY_CONTAINER_NAME: redis-kkizq7m30dww6cdrl8xxfajq-204751616619
+      SERVICE_NAME_POSTGRES: postgres
+      SERVICE_NAME_REDIS: redis
+      SERVICE_NAME_WAHA: waha
+      SERVICE_NAME_SIYAP_APP: siyap-app
+    env_file:
+      - .env
   waha:
     image: devlikeapro/waha
-    container_name: siyap-waha
+    container_name: waha-kkizq7m30dww6cdrl8xxfajq-204751621378
     restart: unless-stopped
     environment:
-      # Engine NoWeb — lightweight, no Chromium needed (~256MB RAM)
       WHATSAPP_DEFAULT_ENGINE: NOWEB
-      # Dashboard credentials
-      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
-      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:-KimayaWaha2026!}
-      # API Key for REST calls
-      WAHA_API_KEY: ${WAHA_API_KEY:-kimaya-siyap-api-key-2026}
-      # Webhook to forward incoming messages to the app
-      WHATSAPP_HOOK_URL: http://siyap-app:3000/api/webhooks/whatsapp
-      WHATSAPP_HOOK_EVENTS: "message,message.ack,session.status"
-      # Auto-start default session
+      WAHA_DASHBOARD_USERNAME: admin
+      WAHA_DASHBOARD_PASSWORD: KimayaWaha2026!
+      WAHA_API_KEY: kimaya-siyap-api-key-2026
+      WHATSAPP_HOOK_URL: 'http://siyap-app:3000/api/webhooks/whatsapp'
+      WHATSAPP_HOOK_EVENTS: 'message,message.ack,session.status'
       WHATSAPP_START_SESSION: default
-      # Log level
       WAHA_LOG_LEVEL: info
-    ports:
-      - "3001:3000"
+      COOLIFY_BRANCH: '"main"'
+      COOLIFY_RESOURCE_UUID: kkizq7m30dww6cdrl8xxfajq
+      COOLIFY_CONTAINER_NAME: waha-kkizq7m30dww6cdrl8xxfajq-204751621378
+      SERVICE_NAME_POSTGRES: postgres
+      SERVICE_NAME_REDIS: redis
+      SERVICE_NAME_WAHA: waha
+      SERVICE_NAME_SIYAP_APP: siyap-app
     volumes:
-      - waha_sessions:/app/.sessions
+      - 'kkizq7m30dww6cdrl8xxfajq_waha-sessions:/app/.sessions'
     depends_on:
       - redis
     networks:
-      - siyap-network
-
-  # ---- SIYAP Next.js Application ----
+      siyap-network: null
+      kkizq7m30dww6cdrl8xxfajq: null
+    labels:
+      - coolify.managed=true
+      - coolify.version=4.0.0
+      - coolify.applicationId=1
+      - coolify.type=application
+      - coolify.name=waha-kkizq7m30dww6cdrl8xxfajq-204751621378
+      - coolify.resourceName=kimaya-applicationmain-ka4a0uma4xn32n9sc2j7qh14
+      - coolify.projectName=kimaya
+      - coolify.serviceName=kimaya-applicationmain-ka4a0uma4xn32n9sc2j7qh14
+      - coolify.environmentName=production
+      - coolify.pullRequestId=0
+    env_file:
+      - .env
   siyap-app:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        # Inlined into client JS bundle at build time. Required for
-        # navigator.pushManager.subscribe() in the browser. Source from .env.
-        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
-    container_name: siyap-app
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: '${NEXT_PUBLIC_VAPID_PUBLIC_KEY}'
+    container_name: siyap-app-kkizq7m30dww6cdrl8xxfajq-204751630479
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${DATABASE_USER:-siyap_admin}:${DATABASE_PASSWORD:-SiyapKimaya2026!}@postgres:5432/${DATABASE_NAME:-siyap_db}?schema=public
-      REDIS_URL: redis://redis:6379
-      WAHA_API_URL: http://waha:3000
-      WAHA_API_KEY: ${WAHA_API_KEY:-kimaya-siyap-api-key-2026}
-      JWT_SECRET: ${JWT_SECRET:-kimaya-siyap-jwt-secret-change-in-production-2026}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
-      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-30d}
-      # Set COOKIE_SECURE=false in .env when serving over plain HTTP (LAN test).
-      # Default = true (matches NODE_ENV=production). Browsers reject Secure
-      # cookies on non-HTTPS origins, which silently breaks login on phones.
-      COOKIE_SECURE: ${COOKIE_SECURE:-}
-      # Web Push (VAPID). Both must be set or server-side push delivery is disabled.
-      # NEXT_PUBLIC_* is also needed at build-time for the browser bundle, but the
-      # server route reads it via process.env at runtime so it must be passed here too.
-      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-    ports:
-      - "3000:3000"
+      DATABASE_URL: 'postgresql://${DATABASE_USER:-siyap_admin}:${DATABASE_PASSWORD:-SiyapKimaya2026!}@postgres:5432/${DATABASE_NAME:-siyap_db}?schema=public'
+      REDIS_URL: 'redis://redis:6379'
+      WAHA_API_URL: 'http://waha:3000'
+      WAHA_API_KEY: kimaya-siyap-api-key-2026
+      JWT_SECRET: kimaya-siyap-jwt-secret-change-in-production-2026
+      JWT_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 30d
+      COOKIE_SECURE: ''
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: '${NEXT_PUBLIC_VAPID_PUBLIC_KEY}'
+      VAPID_PRIVATE_KEY: '${VAPID_PRIVATE_KEY}'
+      COOLIFY_BRANCH: '"main"'
+      COOLIFY_RESOURCE_UUID: kkizq7m30dww6cdrl8xxfajq
+      COOLIFY_CONTAINER_NAME: siyap-app-kkizq7m30dww6cdrl8xxfajq-204751630479
+      SERVICE_NAME_POSTGRES: postgres
+      SERVICE_NAME_REDIS: redis
+      SERVICE_NAME_WAHA: waha
+      SERVICE_NAME_SIYAP_APP: siyap-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,9 +158,21 @@ services:
       waha:
         condition: service_started
     networks:
-      - siyap-network
-
-# ---- Volumes (Persistent Data) ----
+      siyap-network: null
+      kkizq7m30dww6cdrl8xxfajq: null
+    labels:
+      - coolify.managed=true
+      - coolify.version=4.0.0
+      - coolify.applicationId=1
+      - coolify.type=application
+      - coolify.name=siyap-app-kkizq7m30dww6cdrl8xxfajq-204751630479
+      - coolify.resourceName=kimaya-applicationmain-ka4a0uma4xn32n9sc2j7qh14
+      - coolify.projectName=kimaya
+      - coolify.serviceName=kimaya-applicationmain-ka4a0uma4xn32n9sc2j7qh14
+      - coolify.environmentName=production
+      - coolify.pullRequestId=0
+    env_file:
+      - .env
 volumes:
   postgres_data:
     driver: local
@@ -133,8 +180,15 @@ volumes:
     driver: local
   waha_sessions:
     driver: local
-
-# ---- Network ----
+  kkizq7m30dww6cdrl8xxfajq_postgres-data:
+    name: kkizq7m30dww6cdrl8xxfajq_postgres-data
+  kkizq7m30dww6cdrl8xxfajq_redis-data:
+    name: kkizq7m30dww6cdrl8xxfajq_redis-data
+  kkizq7m30dww6cdrl8xxfajq_waha-sessions:
+    name: kkizq7m30dww6cdrl8xxfajq_waha-sessions
 networks:
   siyap-network:
     driver: bridge
+  kkizq7m30dww6cdrl8xxfajq:
+    name: kkizq7m30dww6cdrl8xxfajq
+    external: true

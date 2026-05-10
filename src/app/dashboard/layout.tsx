@@ -6,6 +6,8 @@ import Header from "@/app/components/Header";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { Loader2 } from "lucide-react";
 
+import PushSubscriptionManager from "@/components/PushSubscriptionManager";
+
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, loading } = useAuth();
@@ -41,6 +43,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <PushSubscriptionManager />
     </div>
   );
 }

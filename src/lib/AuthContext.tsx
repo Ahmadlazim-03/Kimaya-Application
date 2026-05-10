@@ -46,7 +46,15 @@ const ROLE_PAGES: Record<string, UserRole[]> = {
   "/dashboard/attendance/calendar": ["MANAGER", "CS"],
   "/dashboard/reports":    ["MANAGER", "CS", "THERAPIST"],
   "/dashboard/scoring":    ["MANAGER", "CS"],
-  "/dashboard/reminders":  ["MANAGER", "CS"],
+  // Reminder root accepts all roles. Sub-paths refine:
+  //   /reminders          → admin landing (page auto-redirects THERAPIST to /my)
+  //   /reminders/my       → therapist landing
+  //   /reminders/calendar → admin only (longest match wins)
+  //   /reminders/[id]/respond  → all (API enforces ownership)
+  //   /reminders/[id]/responses → admin only
+  "/dashboard/reminders":            ["DEVELOPER", "MANAGER", "CS", "THERAPIST"],
+  "/dashboard/reminders/calendar":   ["DEVELOPER", "MANAGER", "CS"],
+  "/dashboard/reminders/my":         ["THERAPIST"],
   "/dashboard/employees":  ["DEVELOPER", "MANAGER", "CS"],
   "/dashboard/settings":   ["DEVELOPER", "MANAGER"],
   "/dashboard/locations":  ["DEVELOPER", "MANAGER"],

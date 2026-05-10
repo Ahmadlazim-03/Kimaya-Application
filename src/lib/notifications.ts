@@ -4,6 +4,95 @@
  */
 import prisma from "@/lib/prisma";
 import { sendText, phoneToWaChatId } from "@/lib/waha";
+import webpush from "web-push";
+
+// Configure Web Push
+if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    "mailto:admin@kimaya.com",
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
+
+export interface PushDeliveryResult {
+  /** Number of subscription rows we attempted to deliver to. */
+  attempted: number;
+  /** Number that succeeded (push service accepted, 2xx). */
+  delivered: number;
+  /** Number that failed (any non-2xx, including expired). */
+  failed: number;
+  /** Number of expired subscriptions cleaned up (410/404). */
+  pruned: number;
+  /** Reason this user got 0 deliveries — useful for debugging. */
+  skipReason?: "no-subscription" | "vapid-not-configured" | "user-not-found";
+}
+
+/**
+ * Send Web Push Notification to a User. Returns delivery diagnostics so the
+ * caller can surface why a recipient didn't receive anything (the most common
+ * cause is no active push subscription on their device).
+ */
+export async function sendWebPushToUser(
+  userId: string,
+  title: string,
+  body: string,
+  url: string = "/dashboard",
+  vibrate?: number[]
+): Promise<PushDeliveryResult> {
+  const result: PushDeliveryResult = { attempted: 0, delivered: 0, failed: 0, pruned: 0 };
+
+  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    console.error("[Push] VAPID keys not configured — push delivery disabled");
+    result.skipReason = "vapid-not-configured";
+    return result;
+  }
+
+  try {
+    const subscriptions = await prisma.pushSubscription.findMany({ where: { userId } });
+
+    if (!subscriptions.length) {
+      console.warn(`[Push] User ${userId} has no active push subscription — skipping push delivery`);
+      result.skipReason = "no-subscription";
+      return result;
+    }
+
+    result.attempted = subscriptions.length;
+
+    const payload = JSON.stringify({
+      title,
+      body,
+      data: { url },
+      vibrate: vibrate || [500, 250, 500, 250, 1000],
+    });
+
+    await Promise.all(subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        );
+        result.delivered++;
+      } catch (err: unknown) {
+        const statusCode = (err as { statusCode?: number })?.statusCode;
+        if (statusCode === 410 || statusCode === 404) {
+          // Expired / unsubscribed at provider — clean up so we don't keep retrying.
+          await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+          result.pruned++;
+        } else {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[Push] Send failed for sub ${sub.id} (status=${statusCode}):`, msg);
+        }
+        result.failed++;
+      }
+    }));
+
+    return result;
+  } catch (error) {
+    console.error("[Push] sendWebPushToUser unexpected error:", error);
+    return result;
+  }
+}
 
 /**
  * Notify Manager/CS when a new report is submitted by a Therapist

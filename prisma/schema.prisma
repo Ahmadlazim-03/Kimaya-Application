@@ -153,8 +153,10 @@ model User {
   initiativeReceived InitiativePoint[]    @relation("ReceivedBy")
   remindersCreated   Reminder[]
   reminderLogs       ReminderLog[]
+  reminderResponses  ReminderResponse[]
   auditLogs          AuditLog[]
   attendanceApprovals Attendance[]        @relation("AttendanceApprovals")
+  pushSubscriptions  PushSubscription[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -349,6 +351,7 @@ model Reminder {
   createdById       String?              @map("created_by")
 
   logs              ReminderLog[]
+  responses         ReminderResponse[]
 
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
@@ -365,13 +368,50 @@ model ReminderLog {
   status        String          @default("SENT") @db.VarChar(20)
   errorMessage  String?         @map("error_message") @db.Text
   wahaMessageId String?         @map("waha_message_id") @db.VarChar(100)
+  renderedMessage String?       @map("rendered_message") @db.Text
 
-  reminder      Reminder        @relation(fields: [reminderId], references: [id], onDelete: Cascade)
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminder      Reminder           @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  response      ReminderResponse?
 
   @@index([reminderId])
   @@index([sentAt])
+  @@index([userId, sentAt])
   @@map("reminder_logs")
+}
+
+// 1 response per (reminder kiriman = ReminderLog) — therapist may edit later.
+model ReminderResponse {
+  id            String   @id @default(uuid())
+  reminderLogId String   @unique @map("reminder_log_id")
+  reminderId    String   @map("reminder_id")
+  userId        String   @map("user_id")
+  caption       String?  @db.Text
+  respondedAt   DateTime @default(now()) @map("responded_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  log           ReminderLog             @relation(fields: [reminderLogId], references: [id], onDelete: Cascade)
+  reminder      Reminder                @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  user          User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images        ReminderResponseImage[]
+
+  @@index([reminderId, respondedAt])
+  @@index([userId, respondedAt])
+  @@map("reminder_responses")
+}
+
+model ReminderResponseImage {
+  id          String   @id @default(uuid())
+  responseId  String   @map("response_id")
+  photoUrl    String   @map("photo_url") @db.Text
+  description String?  @db.Text
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  response    ReminderResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([responseId])
+  @@map("reminder_response_images")
 }
 
 model AuditLog {
@@ -401,4 +441,19 @@ model SystemConfig {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("system_config")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String   @db.Text
+  p256dh    String   @db.Text
+  auth      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }

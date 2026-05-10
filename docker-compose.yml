@@ -86,6 +86,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Inlined into client JS bundle at build time. Required for
+        # navigator.pushManager.subscribe() in the browser. Source from .env.
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
     container_name: siyap-app
     restart: unless-stopped
     environment:
@@ -97,6 +101,15 @@ services:
       JWT_SECRET: ${JWT_SECRET:-kimaya-siyap-jwt-secret-change-in-production-2026}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-30d}
+      # Set COOKIE_SECURE=false in .env when serving over plain HTTP (LAN test).
+      # Default = true (matches NODE_ENV=production). Browsers reject Secure
+      # cookies on non-HTTPS origins, which silently breaks login on phones.
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      # Web Push (VAPID). Both must be set or server-side push delivery is disabled.
+      # NEXT_PUBLIC_* is also needed at build-time for the browser bundle, but the
+      # server route reads it via process.env at runtime so it must be passed here too.
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
     ports:
       - "3000:3000"
     depends_on:

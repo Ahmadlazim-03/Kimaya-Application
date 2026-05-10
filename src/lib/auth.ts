@@ -90,11 +90,30 @@ export async function createSession(user: SessionUser): Promise<string> {
   return token;
 }
 
+/**
+ * Whether the session cookie should be marked Secure.
+ *
+ * Production over HTTPS → must be true (default).
+ * Production over plain HTTP (e.g. LAN testing on a phone via http://192.168.x.x):
+ *   the browser will REJECT a Secure cookie on a non-secure origin, so login
+ *   silently fails (cookie never stored → /api/auth/me returns 401 →
+ *   AuthContext bounces to /login).
+ *
+ * Set COOKIE_SECURE=false in your env to opt out when serving over HTTP.
+ * Set COOKIE_SECURE=true to force-on regardless of NODE_ENV.
+ */
+function shouldUseSecureCookie(): boolean {
+  const explicit = process.env.COOKIE_SECURE;
+  if (explicit === "true") return true;
+  if (explicit === "false") return false;
+  return process.env.NODE_ENV === "production";
+}
+
 export async function setSessionCookie(token: string) {
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 8 * 60 * 60,

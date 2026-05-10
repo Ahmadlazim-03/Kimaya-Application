@@ -18,6 +18,14 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# NEXT_PUBLIC_* env vars are inlined into the client JS bundle at build time.
+# Because .dockerignore excludes .env from the build context (correct for
+# security), we MUST pass them as ARG → ENV here, otherwise the browser code
+# will see `undefined` and Push subscription will fail before contacting the
+# server.
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY=""
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Generate Prisma Client before building

@@ -24,13 +24,16 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      # NOTE: init.sql intentionally NOT mounted. Schema is owned by Prisma
+      # (`prisma db push` in entrypoint.sh), seed data by prisma/seed.js.
+      # Mounting init.sql would duplicate / conflict with Prisma's view of the
+      # schema and made postgres init fail on fresh Coolify volumes.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-siyap_admin} -d ${DATABASE_NAME:-siyap_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     networks:
       - siyap-network
 

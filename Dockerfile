@@ -8,7 +8,14 @@ RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps
+
+# Force-install devDependencies even when NODE_ENV=production is set at build
+# time (Coolify injects this automatically into every stage). Without these,
+# `npm ci` would skip TypeScript / Next / etc and the next stage's
+# `npm run build` would fail.
+ENV NODE_ENV=development
+ENV NPM_CONFIG_PRODUCTION=false
+RUN npm ci --legacy-peer-deps --include=dev
 
 # --- Stage 2: Build ---
 FROM node:20-alpine AS builder
@@ -17,6 +24,11 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Force Next.js production build regardless of what build-time NODE_ENV
+# orchestrators (Coolify) propagate. The deps stage already installed dev
+# dependencies, so they're present in node_modules.
+ENV NODE_ENV=production
 
 # NEXT_PUBLIC_* env vars are inlined into the client JS bundle at build time.
 # Because .dockerignore excludes .env from the build context (correct for

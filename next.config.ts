@@ -5,8 +5,11 @@ const withPWA = withPWAInit({
   dest: "public",
   customWorkerSrc: "src/worker",
   disable: process.env.NODE_ENV === "development",
-  // Auto-register the SW from the client (default true, but be explicit).
-  register: true,
+  // We register the SW manually via src/components/ServiceWorkerRegister.tsx
+  // because next-pwa's auto-injection is unreliable with Next 16 App Router +
+  // Turbopack (especially on iOS standalone PWAs). Setting this false avoids
+  // double-registration races.
+  register: false,
   // Critical for installed PWAs on phones: when a new SW is built and deployed,
   // the old one sits in `waiting` state until every tab/PWA window is fully
   // closed. On installed PWAs users rarely swipe-kill, so they're stuck on the

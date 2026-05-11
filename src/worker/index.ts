@@ -13,6 +13,14 @@ sw.addEventListener("install", () => {
   sw.skipWaiting();
 });
 
+// Allow the client (ServiceWorkerRegister) to nudge a waiting SW to activate
+// on demand — used when a new SW installed but old one still controls page.
+sw.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    sw.skipWaiting();
+  }
+});
+
 // As soon as this SW activates, claim every open client so they start using
 // it immediately (no need to reload the page). Pairs with skipWaiting above.
 sw.addEventListener("activate", (event) => {

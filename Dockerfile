@@ -70,6 +70,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/jose ./node_modules/jose
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modules/bcryptjs
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/web-push ./node_modules/web-push
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/http_ece ./node_modules/http_ece
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/asn1.js ./node_modules/asn1.js
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bn.js ./node_modules/bn.js
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/minimist ./node_modules/minimist
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/inherits ./node_modules/inherits
 
 # Copy entrypoint script
 COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh

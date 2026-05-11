@@ -6,6 +6,19 @@ export {};
 // service-worker scope inside this module instead.
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
+// Force this SW to skip the "waiting" phase. Without this, when we deploy a
+// new build, installed PWAs on phones keep using the OLD (possibly broken)
+// SW until every window is fully swipe-killed — which users almost never do.
+sw.addEventListener("install", () => {
+  sw.skipWaiting();
+});
+
+// As soon as this SW activates, claim every open client so they start using
+// it immediately (no need to reload the page). Pairs with skipWaiting above.
+sw.addEventListener("activate", (event) => {
+  event.waitUntil(sw.clients.claim());
+});
+
 // Listen for push events
 sw.addEventListener("push", (event) => {
   if (!event.data) return;

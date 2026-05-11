@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { Loader2 } from "lucide-react";
 
 import PushSubscriptionManager from "@/components/PushSubscriptionManager";
+import PermissionSetup from "@/components/PermissionSetup";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -44,6 +45,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <PushSubscriptionManager />
+      <PermissionSetup />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import SplashScreen from "@/components/SplashScreen";
 
 export const viewport = {
   themeColor: "#4A5D23",
@@ -37,6 +38,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col antialiased">
+        <SplashScreen />
         <ServiceWorkerRegister />
         {children}
       </body>

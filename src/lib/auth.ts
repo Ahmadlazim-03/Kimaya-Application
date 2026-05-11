@@ -34,6 +34,10 @@ export const ROLE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/reminders":  ["DEVELOPER", "MANAGER", "CS"],
   "/dashboard/employees":  ["DEVELOPER", "MANAGER", "CS"],
   "/dashboard/settings":   ["DEVELOPER", "MANAGER"],
+  // Profile page is self-service and available to all roles. Note: this
+  // entry must be MORE SPECIFIC than `/dashboard/settings` above so the
+  // longest-prefix match in canAccess() picks it for therapists.
+  "/dashboard/settings/profile": ["DEVELOPER", "MANAGER", "CS", "THERAPIST"],
 };
 
 // Menu items visible per role
@@ -50,7 +54,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { label: "Absensi",     href: "/dashboard/attendance",  icon: "Clock",           section: "main",  roles: ["MANAGER", "CS", "THERAPIST"] },
   { label: "Laporan",     href: "/dashboard/reports",     icon: "FileText",        section: "main",  roles: ["DEVELOPER", "MANAGER", "CS", "THERAPIST"] },
   { label: "Skoring",     href: "/dashboard/scoring",     icon: "Star",            section: "main",  roles: ["DEVELOPER", "MANAGER", "CS"] },
-  { label: "Reminder",    href: "/dashboard/reminders",   icon: "Bell",            section: "main",  roles: ["DEVELOPER", "MANAGER", "CS"] },
+  { label: "Pengingat",   href: "/dashboard/reminders",   icon: "Bell",            section: "main",  roles: ["DEVELOPER", "MANAGER", "CS"] },
   { label: "Karyawan",    href: "/dashboard/employees",   icon: "Users",           section: "admin", roles: ["DEVELOPER", "MANAGER", "CS"] },
   { label: "Pengaturan",  href: "/dashboard/settings",    icon: "Settings",        section: "admin", roles: ["DEVELOPER", "MANAGER"] },
 ];

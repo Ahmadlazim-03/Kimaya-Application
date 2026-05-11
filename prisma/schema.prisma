@@ -76,9 +76,15 @@ enum ReminderChannel {
 
 enum ReminderSchedule {
   IMMEDIATE
+  ONE_TIME
   DAILY
   WEEKLY
   CUSTOM_CRON
+}
+
+enum ReminderTargetMode {
+  ALL_THERAPISTS
+  SELECTED
 }
 
 enum ReminderActiveStatus {
@@ -112,6 +118,7 @@ model Location {
   geofenceRadiusM Int      @default(100) @map("geofence_radius_m")
 
   users           User[]
+  remindersScoped Reminder[] @relation("ReminderLocationScope")
 
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -136,6 +143,10 @@ model User {
   googleId         String?    @map("google_id") @db.VarChar(255)
   lastLoginAt      DateTime?  @map("last_login_at")
 
+  // Forgot-password flow: token + expiry (hashed token stored)
+  resetTokenHash      String?   @map("reset_token_hash") @db.VarChar(255)
+  resetTokenExpiresAt DateTime? @map("reset_token_expires_at")
+
   department       Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   departmentId     String?     @map("department_id")
   location         Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -154,6 +165,7 @@ model User {
   remindersCreated   Reminder[]
   reminderLogs       ReminderLog[]
   reminderResponses  ReminderResponse[]
+  reminderRecipients ReminderRecipient[]
   auditLogs          AuditLog[]
   attendanceApprovals Attendance[]        @relation("AttendanceApprovals")
   pushSubscriptions  PushSubscription[]
@@ -336,27 +348,80 @@ model Reminder {
   id                String               @id @default(uuid())
   title             String               @db.VarChar(200)
   messageTemplate   String               @map("message_template") @db.Text
+
+  // Targeting: ALL_THERAPISTS sends to every THERAPIST in scope.
+  // SELECTED sends to users listed in `recipients`. Either way, CS-created
+  // reminders are scoped to the creator's location (locationScopeId).
+  targetMode        ReminderTargetMode   @default(ALL_THERAPISTS) @map("target_mode")
+  locationScopeId   String?              @map("location_scope_id")
+  locationScope     Location?            @relation("ReminderLocationScope", fields: [locationScopeId], references: [id], onDelete: SetNull)
+
+  // Legacy single-target fields kept for backward-compat with existing rows.
+  // New UI uses `recipients` instead.
   targetRole        UserRole?            @map("target_role")
   targetDepartmentId String?             @map("target_department_id")
   targetUserId      String?              @map("target_user_id")
+
   channel           ReminderChannel      @default(WHATSAPP)
   scheduleType      ReminderSchedule     @default(DAILY) @map("schedule_type")
   cronExpression    String?              @map("cron_expression") @db.VarChar(50)
+
+  // For DAILY / WEEKLY: store as HH:MM local time (Asia/Jakarta).
   scheduledTime     DateTime?            @map("scheduled_time") @db.Time()
+  // For WEEKLY: 0=Sunday … 6=Saturday.
   scheduledDay      Int?                 @map("scheduled_day")
+  // For ONE_TIME: exact UTC instant when scheduler should fire.
+  scheduledAt       DateTime?            @map("scheduled_at")
+
   status            ReminderActiveStatus @default(ACTIVE)
   lastSentAt        DateTime?            @map("last_sent_at")
 
   createdBy         User?                @relation(fields: [createdById], references: [id])
   createdById       String?              @map("created_by")
 
+  images            ReminderImage[]
+  recipients        ReminderRecipient[]
   logs              ReminderLog[]
   responses         ReminderResponse[]
 
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
 
+  @@index([status, scheduleType])
+  @@index([scheduledAt])
   @@map("reminders")
+}
+
+// Optional image attachments on a reminder (shown in the respond page only —
+// WhatsApp send is text-only because WAHA image API is paid).
+model ReminderImage {
+  id         String   @id @default(uuid())
+  reminderId String   @map("reminder_id")
+  photoUrl   String   @map("photo_url") @db.Text
+  caption    String?  @db.Text
+  order      Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  reminder   Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+
+  @@index([reminderId])
+  @@map("reminder_images")
+}
+
+// Many-to-many: which specific therapists should receive this reminder when
+// targetMode = SELECTED. Ignored when targetMode = ALL_THERAPISTS.
+model ReminderRecipient {
+  id         String   @id @default(uuid())
+  reminderId String   @map("reminder_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  reminder   Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reminderId, userId])
+  @@index([userId])
+  @@map("reminder_recipients")
 }
 
 model ReminderLog {
@@ -370,6 +435,14 @@ model ReminderLog {
   wahaMessageId String?         @map("waha_message_id") @db.VarChar(100)
   renderedMessage String?       @map("rendered_message") @db.Text
 
+  // Read receipt: set when the therapist opens the respond page. The
+  // scheduler uses this to decide whether to retry an un-opened reminder.
+  readAt        DateTime?       @map("read_at")
+  // How many times this reminder has been re-sent to this user. The scheduler
+  // caps retries at 2 (so each user sees at most 3 deliveries: initial + 2 retries).
+  retryCount    Int             @default(0) @map("retry_count")
+  lastRetryAt   DateTime?       @map("last_retry_at")
+
   reminder      Reminder           @relation(fields: [reminderId], references: [id], onDelete: Cascade)
   user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   response      ReminderResponse?
@@ -377,6 +450,7 @@ model ReminderLog {
   @@index([reminderId])
   @@index([sentAt])
   @@index([userId, sentAt])
+  @@index([readAt, retryCount])
   @@map("reminder_logs")
 }
 

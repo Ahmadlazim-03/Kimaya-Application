@@ -142,12 +142,12 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
                   </div>
                 </div>
                 <div className="py-1">
-                  <a href="/dashboard/settings" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-kimaya-brown hover:bg-kimaya-cream/50 transition-colors">
+                  <a href="/dashboard/settings/profile" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-kimaya-brown hover:bg-kimaya-cream/50 transition-colors">
                     <User size={16} strokeWidth={1.5} /> Profil Saya
                   </a>
                   {isAdmin && (
                     <a href="/dashboard/settings" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-kimaya-brown hover:bg-kimaya-cream/50 transition-colors">
-                      <Settings size={16} strokeWidth={1.5} /> Pengaturan
+                      <Settings size={16} strokeWidth={1.5} /> Pengaturan Sistem
                     </a>
                   )}
                 </div>

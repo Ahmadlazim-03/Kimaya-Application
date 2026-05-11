@@ -53,7 +53,14 @@ async function authorize(reminderId: string, logId: string | null) {
 
   const log = await prisma.reminderLog.findUnique({
     where: { id: logId },
-    include: { reminder: { select: { id: true, title: true, messageTemplate: true } } },
+    include: {
+      reminder: {
+        select: {
+          id: true, title: true, messageTemplate: true,
+          images: { orderBy: { order: "asc" }, select: { id: true, photoUrl: true, caption: true, order: true } },
+        },
+      },
+    },
   });
   if (!log) return { error: NextResponse.json({ error: "Pengiriman reminder tidak ditemukan" }, { status: 404 }) };
   if (log.reminderId !== reminderId) {
@@ -75,6 +82,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const auth = await authorize(id, logId);
     if ("error" in auth) return auth.error;
     const { log } = auth;
+
+    // Mark this log as "read" the first time the therapist opens the page.
+    // The scheduler uses this to skip retry-sending opened reminders.
+    if (!log.readAt) {
+      await prisma.reminderLog.update({
+        where: { id: log.id },
+        data: { readAt: new Date() },
+      }).catch(() => { /* non-fatal */ });
+    }
 
     const response = await prisma.reminderResponse.findUnique({
       where: { reminderLogId: log.id },

@@ -208,6 +208,9 @@ export default function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 rounded border-kimaya-cream-dark text-kimaya-olive focus:ring-kimaya-olive/30" />
                 <span className="text-sm text-kimaya-brown-light/70">Ingat saya</span>
               </label>
+              <a href="/forgot-password" className="text-sm text-kimaya-olive hover:text-kimaya-olive-dark hover:underline">
+                Lupa kata sandi?
+              </a>
             </div>
 
             {/* Submit */}

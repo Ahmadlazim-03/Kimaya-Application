@@ -20,7 +20,17 @@ interface ImageItem {
 }
 
 interface LoadedData {
-  log: { id: string; sentAt: string; renderedMessage: string | null; reminder: { id: string; title: string; messageTemplate: string } };
+  log: {
+    id: string;
+    sentAt: string;
+    renderedMessage: string | null;
+    reminder: {
+      id: string;
+      title: string;
+      messageTemplate: string;
+      images: { id: string; photoUrl: string; caption: string | null; order: number }[];
+    };
+  };
   response: {
     id: string;
     caption: string | null;
@@ -248,6 +258,30 @@ export default function RespondPage() {
             {data.log.renderedMessage && (
               <div className="mt-3 p-3 rounded-xl bg-kimaya-cream/40 text-sm text-kimaya-brown whitespace-pre-wrap">
                 {data.log.renderedMessage}
+              </div>
+            )}
+
+            {/* Lampiran gambar dari admin pembuat pengingat */}
+            {data.log.reminder.images.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[11px] text-kimaya-brown-light/60 mb-2 font-medium">
+                  Lampiran ({data.log.reminder.images.length})
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {data.log.reminder.images.map((img) => (
+                    <a key={img.id} href={img.photoUrl} target="_blank" rel="noopener noreferrer"
+                      className="group relative aspect-square rounded-xl overflow-hidden bg-kimaya-cream-dark/20 ring-1 ring-kimaya-cream-dark/40 hover:ring-kimaya-olive/40 transition">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.photoUrl} alt={img.caption || `Lampiran ${img.order + 1}`}
+                        className="w-full h-full object-cover" />
+                      {img.caption && (
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                          <p className="text-[11px] text-white line-clamp-2">{img.caption}</p>
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </div>

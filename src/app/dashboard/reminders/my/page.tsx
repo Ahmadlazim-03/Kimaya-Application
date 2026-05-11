@@ -78,9 +78,9 @@ export default function MyRemindersPage() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-3xl mx-auto space-y-5 pb-12">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-serif text-kimaya-brown">Reminder Saya</h1>
+        <h1 className="text-2xl font-serif text-kimaya-brown">Pengingat Saya</h1>
         <p className="text-sm text-kimaya-brown-light/60 mt-1">
-          Tugas dan pengingat yang dikirim untuk Anda
+          Daftar tugas dan pesan yang dikirim untuk Anda
         </p>
       </div>
 
@@ -129,7 +129,7 @@ export default function MyRemindersPage() {
         <div className="bg-white rounded-2xl border border-kimaya-cream-dark/30 p-12 text-center">
           <Inbox size={40} className="mx-auto text-kimaya-brown-light/30 mb-3" />
           <p className="text-sm text-kimaya-brown-light/50">
-            Belum ada reminder untuk {periodLabels[period].toLowerCase()}.
+            Belum ada pengingat untuk {periodLabels[period].toLowerCase()}.
           </p>
         </div>
       )}
@@ -182,7 +182,7 @@ function PendingCard({ item }: { item: ReminderItem }) {
             </p>
             <div className="flex items-center justify-between mt-3">
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                <Camera size={10} /> Tap untuk balas
+                <Camera size={10} /> Ketuk untuk balas
               </span>
               <ChevronRight size={16} className="text-amber-500" />
             </div>

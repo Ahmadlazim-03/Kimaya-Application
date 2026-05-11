@@ -145,6 +145,16 @@ services:
       COOKIE_SECURE: ''
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: '${NEXT_PUBLIC_VAPID_PUBLIC_KEY}'
       VAPID_PRIVATE_KEY: '${VAPID_PRIVATE_KEY}'
+      # Forgot-password email (Gmail SMTP). Get an App Password from
+      # https://myaccount.google.com/apppasswords — the regular Gmail
+      # password will NOT work because 2FA is required.
+      SMTP_HOST: '${SMTP_HOST:-smtp.gmail.com}'
+      SMTP_PORT: '${SMTP_PORT:-587}'
+      SMTP_USER: '${SMTP_USER}'
+      SMTP_PASS: '${SMTP_PASS}'
+      SMTP_FROM: '${SMTP_FROM}'
+      # Public HTTPS origin — used to build reset-password links in emails.
+      NEXT_PUBLIC_APP_URL: '${NEXT_PUBLIC_APP_URL}'
       COOLIFY_BRANCH: '"main"'
       COOLIFY_RESOURCE_UUID: kkizq7m30dww6cdrl8xxfajq
       COOLIFY_CONTAINER_NAME: siyap-app-kkizq7m30dww6cdrl8xxfajq-204751630479

@@ -125,13 +125,13 @@ export default function ReminderCalendarPage() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-[1400px] mx-auto space-y-5 pb-12">
       <button onClick={() => router.push("/dashboard/reminders")}
         className="flex items-center gap-2 text-sm text-kimaya-brown-light/60 hover:text-kimaya-brown transition">
-        <ArrowLeft size={16} /> Kembali ke Reminder
+        <ArrowLeft size={16} /> Kembali ke Pengingat
       </button>
 
       <div>
-        <h1 className="text-2xl font-serif text-kimaya-brown">Tracking Reminder</h1>
+        <h1 className="text-2xl font-serif text-kimaya-brown">Kalender Pengingat</h1>
         <p className="text-sm text-kimaya-brown-light/60 mt-1">
-          Pantau pengiriman dan tanggapan reminder per hari
+          Pantau pengiriman dan balasan pengingat per hari
         </p>
       </div>
 

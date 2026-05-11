@@ -48,7 +48,7 @@ export default function ResponsesPage() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-5xl mx-auto space-y-5 pb-12">
       <button onClick={() => router.push("/dashboard/reminders")}
         className="flex items-center gap-2 text-sm text-kimaya-brown-light/60 hover:text-kimaya-brown transition">
-        <ArrowLeft size={16} /> Kembali ke Reminder
+        <ArrowLeft size={16} /> Kembali ke Pengingat
       </button>
 
       <div className="bg-white rounded-2xl border border-kimaya-cream-dark/30 p-5 sm:p-6 shadow-sm">
@@ -76,7 +76,7 @@ export default function ResponsesPage() {
           </div>
           <div className="bg-kimaya-olive/10 rounded-xl p-3 text-center">
             <p className="text-2xl font-bold text-kimaya-olive">{data.stats.responseRate}%</p>
-            <p className="text-[10px] uppercase tracking-wider text-kimaya-olive/70 mt-0.5">Response Rate</p>
+            <p className="text-[10px] uppercase tracking-wider text-kimaya-olive/70 mt-0.5">Tingkat Balasan</p>
           </div>
         </div>
       </div>
@@ -85,7 +85,7 @@ export default function ResponsesPage() {
       {data.responses.length === 0 ? (
         <div className="bg-white rounded-2xl border-2 border-dashed border-kimaya-cream-dark/40 p-12 text-center">
           <Inbox size={40} className="mx-auto mb-3 text-kimaya-brown-light/30" />
-          <p className="text-sm text-kimaya-brown-light/50">Belum ada tanggapan dari karyawan</p>
+          <p className="text-sm text-kimaya-brown-light/50">Belum ada balasan dari therapist</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -132,7 +132,7 @@ function ResponseCard({ r, onImageClick }: { r: ResponseEntry; onImageClick: (id
             <Clock size={9} />
             Dibalas {new Date(r.respondedAt).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
             <span>·</span>
-            <span>Reminder dikirim {new Date(r.sentAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            <span>Pengingat dikirim {new Date(r.sentAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
           </p>
         </div>
       </div>

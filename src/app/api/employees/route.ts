@@ -1,9 +1,22 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import prisma from "@/lib/prisma";
+import { getSession, type UserRole } from "@/lib/auth";
+import { canCreateRole } from "@/lib/employeeAuth";
 
+const DEFAULT_PASSWORD = "kimaya2026";
+
+// ─────────────────────────────────────────────────────────────────────────
+// GET — list employees (scoped by viewer role)
+// ─────────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: "Anda belum masuk" }, { status: 401 });
+    if (!["DEVELOPER", "MANAGER", "CS"].includes(session.role)) {
+      return NextResponse.json({ error: "Halaman ini hanya untuk admin" }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const role = searchParams.get("role") || "";
@@ -17,11 +30,16 @@ export async function GET(request: Request) {
     }
     if (role) where.role = role;
 
+    // CS can only see THERAPISTs in their own location.
+    if (session.role === "CS") {
+      where.role = "THERAPIST";
+      if (session.locationId) where.locationId = session.locationId;
+      else return NextResponse.json([]); // CS without a location → nothing to manage
+    }
+
     const employees = await prisma.user.findMany({
       where,
-      include: {
-        location: { select: { name: true } },
-      },
+      include: { location: { select: { id: true, name: true } } },
       orderBy: { fullName: "asc" },
     });
 
@@ -32,6 +50,7 @@ export async function GET(request: Request) {
       phone: e.phone || "-",
       role: e.role,
       location: e.location?.name || "-",
+      locationId: e.location?.id || null,
       status: e.status.toLowerCase(),
       joinDate: e.joinDate?.toISOString().split("T")[0] || "-",
       avatar: e.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
@@ -39,58 +58,105 @@ export async function GET(request: Request) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Employees API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[Employees GET]", error);
+    return NextResponse.json({ error: "Gagal memuat data karyawan" }, { status: 500 });
   }
 }
 
-const DEFAULT_PASSWORD = "kimaya2026";
-
+// ─────────────────────────────────────────────────────────────────────────
+// POST — create employee with full role/location guard
+// ─────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { name, email, role, locationName } = body;
-
-    if (!name || !email) {
-      return NextResponse.json({ error: "Nama dan email wajib diisi" }, { status: 400 });
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: "Anda belum masuk" }, { status: 401 });
+    if (!["DEVELOPER", "MANAGER", "CS"].includes(session.role)) {
+      return NextResponse.json({
+        error: "Hanya developer, manager, dan customer service yang bisa menambah karyawan",
+      }, { status: 403 });
     }
 
-    // Check if email already exists
-    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    const body = await request.json();
+    const name = String(body.name || "").trim();
+    const email = String(body.email || "").trim().toLowerCase();
+    const requestedRole = String(body.role || "THERAPIST") as UserRole;
+    const locationName = body.locationName ? String(body.locationName) : null;
+
+    if (!name) return NextResponse.json({ error: "Nama wajib diisi" }, { status: 400 });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "Format email tidak valid" }, { status: 400 });
+    }
+    if (!["DEVELOPER", "MANAGER", "CS", "THERAPIST"].includes(requestedRole)) {
+      return NextResponse.json({ error: "Role tidak dikenali" }, { status: 400 });
+    }
+
+    // Role-hierarchy guard.
+    if (!canCreateRole(session.role, requestedRole)) {
+      if (session.role === "CS") {
+        return NextResponse.json({
+          error: "Sebagai Customer Service, Anda hanya bisa menambah Therapist.",
+        }, { status: 403 });
+      }
+      return NextResponse.json({
+        error: `Anda tidak diizinkan membuat karyawan dengan role ${requestedRole}`,
+      }, { status: 403 });
+    }
+
+    // Resolve location.
+    let locationId: string | null = null;
+    if (locationName) {
+      const loc = await prisma.location.findFirst({ where: { name: locationName } });
+      if (!loc) {
+        return NextResponse.json({ error: `Lokasi "${locationName}" tidak ditemukan` }, { status: 400 });
+      }
+      locationId = loc.id;
+    }
+
+    // Location-scope guard: CS can ONLY add therapists at their own cabang.
+    if (session.role === "CS") {
+      if (!session.locationId) {
+        return NextResponse.json({
+          error: "Akun CS Anda belum punya cabang. Hubungi developer/manager untuk set lokasi dulu.",
+        }, { status: 400 });
+      }
+      if (locationId && locationId !== session.locationId) {
+        return NextResponse.json({
+          error: "Anda hanya bisa menambah therapist di cabang Anda sendiri.",
+        }, { status: 403 });
+      }
+      // CS doesn't get to choose — we force-set to their own location.
+      locationId = session.locationId;
+    }
+
+    // Unique-email check.
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return NextResponse.json({ error: "Email sudah terdaftar" }, { status: 409 });
     }
 
-    const loc = locationName ? await prisma.location.findFirst({ where: { name: locationName } }) : null;
-
-    // Validate role
-    const validRoles = ["THERAPIST", "CS", "DEVELOPER"];
-    const userRole = validRoles.includes(role) ? role : "THERAPIST";
-
-    // Hash default password
     const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
-
-    // Non-therapist roles skip onboarding (no face verification needed)
-    const needsOnboarding = userRole === "THERAPIST";
+    // Only therapists go through face-verification onboarding.
+    const needsOnboarding = requestedRole === "THERAPIST";
 
     const user = await prisma.user.create({
       data: {
         fullName: name,
-        email: email.toLowerCase().trim(),
-        locationId: loc?.id,
-        role: userRole,
+        email,
+        locationId,
+        role: requestedRole,
         status: "ACTIVE",
         passwordHash,
         onboardingCompleted: !needsOnboarding,
       },
+      select: { id: true, fullName: true, email: true, role: true },
     });
 
-    return NextResponse.json({ 
-      id: user.id, 
-      message: `Karyawan berhasil ditambahkan. Password default: ${DEFAULT_PASSWORD}` 
+    return NextResponse.json({
+      id: user.id,
+      message: `Karyawan ${user.fullName} berhasil ditambahkan. Kata sandi awal: ${DEFAULT_PASSWORD}`,
     }, { status: 201 });
   } catch (error) {
-    console.error("Create employee error:", error);
+    console.error("[Employees POST]", error);
     return NextResponse.json({ error: "Gagal menambahkan karyawan" }, { status: 500 });
   }
 }

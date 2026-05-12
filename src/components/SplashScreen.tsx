@@ -15,34 +15,27 @@ import Image from "next/image";
  */
 export default function SplashScreen() {
   const [phase, setPhase] = useState<"visible" | "fading" | "gone">("visible");
-  const [shouldShow, setShouldShow] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
+  // Decide visibility synchronously during initial render so we never flash
+  // the splash on desktop. (Triggering setState inside an effect just to set
+  // shouldShow=false would cause an unnecessary re-render and lints flag it
+  // as a cascading-render anti-pattern.)
+  const [shouldShow] = useState(() => {
+    if (typeof window === "undefined") return false;
     const isPWA = window.matchMedia("(display-mode: standalone)").matches;
     const isMobile = window.innerWidth < 768;
+    return isPWA || isMobile;
+  });
 
-    // Show only for PWA or mobile viewport; skip for desktop browser.
-    if (!isPWA && !isMobile) {
-      setShouldShow(false);
-      return;
-    }
-
-    setShouldShow(true);
-
-    // Logo flies in: 0 → 800 ms
-    // Logo holds: 800 → 1600 ms
-    // Start fade: 1600 ms
-    // Fully gone + unmount: 2100 ms
+  useEffect(() => {
+    if (!shouldShow) return;
+    // Logo flies in: 0 → 800 ms; holds 800 → 1600 ms; fade 1600 → 2100 ms.
     const fadeTimer = setTimeout(() => setPhase("fading"), 1600);
     const doneTimer = setTimeout(() => setPhase("gone"), 2100);
-
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(doneTimer);
     };
-  }, []);
+  }, [shouldShow]);
 
   if (!shouldShow || phase === "gone") return null;
 

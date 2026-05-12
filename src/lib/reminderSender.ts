@@ -97,7 +97,7 @@ async function resolveRecipients(
   });
   if (!reminder) return [];
 
-  let where: Record<string, unknown> = {
+  const where: Record<string, unknown> = {
     status: { in: ["ACTIVE", "PROBATION"] },
     phone: { not: null },
   };

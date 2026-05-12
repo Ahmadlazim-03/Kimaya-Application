@@ -8,6 +8,7 @@ services:
       POSTGRES_USER: '${DATABASE_USER:-siyap_admin}'
       POSTGRES_PASSWORD: '${DATABASE_PASSWORD:-SiyapKimaya2026!}'
       PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: Asia/Jakarta
       DATABASE_NAME: siyap_db
       DATABASE_USER: siyap_admin
       DATABASE_PASSWORD: SiyapKimaya2026!
@@ -89,9 +90,9 @@ services:
     restart: unless-stopped
     environment:
       WHATSAPP_DEFAULT_ENGINE: NOWEB
-      WAHA_DASHBOARD_USERNAME: admin
-      WAHA_DASHBOARD_PASSWORD: KimayaWaha2026!
-      WAHA_API_KEY: kimaya-siyap-api-key-2026
+      WAHA_DASHBOARD_USERNAME: '${WAHA_DASHBOARD_USERNAME:-admin}'
+      WAHA_DASHBOARD_PASSWORD: '${WAHA_DASHBOARD_PASSWORD:-ChangeMe!}'
+      WAHA_API_KEY: '${WAHA_API_KEY:-ChangeMeProd}'
       WHATSAPP_HOOK_URL: 'http://siyap-app:3000/api/webhooks/whatsapp'
       WHATSAPP_HOOK_EVENTS: 'message,message.ack,session.status'
       WHATSAPP_START_SESSION: default
@@ -135,11 +136,15 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: production
+      # Asia/Jakarta supaya log + Postgres now() konsisten dengan jam WIB yang
+      # admin set di form schedule. Scheduler itself sudah handle WIB di kode,
+      # tapi TZ ini bikin diagnostik lebih intuitif.
+      TZ: Asia/Jakarta
       DATABASE_URL: 'postgresql://${DATABASE_USER:-siyap_admin}:${DATABASE_PASSWORD:-SiyapKimaya2026!}@postgres:5432/${DATABASE_NAME:-siyap_db}?schema=public'
       REDIS_URL: 'redis://redis:6379'
       WAHA_API_URL: 'http://waha:3000'
-      WAHA_API_KEY: kimaya-siyap-api-key-2026
-      JWT_SECRET: kimaya-siyap-jwt-secret-change-in-production-2026
+      WAHA_API_KEY: '${WAHA_API_KEY:-ChangeMeProd}'
+      JWT_SECRET: '${JWT_SECRET:?JWT_SECRET wajib di-set di .env produksi}'
       JWT_EXPIRATION: 15m
       JWT_REFRESH_EXPIRATION: 30d
       COOKIE_SECURE: ''

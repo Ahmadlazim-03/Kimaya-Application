@@ -11,6 +11,17 @@ const EXPIRY = "8h";
 
 export type UserRole = "DEVELOPER" | "MANAGER" | "CS" | "THERAPIST";
 
+/**
+ * Slim session payload — keep this SMALL.
+ *
+ * The whole object gets serialized into the JWT, signed, and stored in an
+ * HTTP cookie. Browsers reject cookies whose name+value exceed 4 KB, so the
+ * payload here must NOT include large fields like base64-encoded photos.
+ * In particular: avatarUrl and facePhotoUrl are data URLs that can each be
+ * 30–50 KB — adding them blew the cookie size limit, the browser silently
+ * dropped Set-Cookie, and login appeared to fail. Photos belong in the DB,
+ * fetched via /api/auth/me when needed.
+ */
 export interface SessionUser {
   id: string;
   email: string;
@@ -18,8 +29,6 @@ export interface SessionUser {
   role: UserRole;
   departmentId?: string;
   locationId?: string;
-  avatarUrl?: string;
-  facePhotoUrl?: string;
 }
 
 // ---- RBAC Permissions ----
@@ -138,8 +147,6 @@ export async function getSession(): Promise<SessionUser | null> {
       role: payload.role as UserRole,
       departmentId: payload.departmentId as string | undefined,
       locationId: payload.locationId as string | undefined,
-      avatarUrl: payload.avatarUrl as string | undefined,
-      facePhotoUrl: payload.facePhotoUrl as string | undefined,
     };
   } catch {
     return null;

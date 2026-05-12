@@ -10,10 +10,16 @@ import type { UserRole } from "@/lib/auth";
 
 interface Employee {
   id: string; name: string; email: string; phone: string; role: UserRole;
-  location: string; locationId: string | null; status: string; joinDate: string;
+  location: string; locationId: string | null;
+  shift: string; shiftId: string | null;
+  status: string; joinDate: string;
   avatar: string; avatarUrl: string | null;
 }
 interface Location { id: string; name: string; }
+interface Shift {
+  id: string; name: string;
+  checkInStart: string; startTime: string; endTime: string;
+}
 
 const ALL_ROLE_LABELS: Record<UserRole, string> = {
   DEVELOPER: "Developer",
@@ -42,6 +48,7 @@ export default function EmployeesPage() {
   const { user: me } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("Semua Role");
@@ -55,6 +62,7 @@ export default function EmployeesPage() {
   const [formEmail, setFormEmail] = useState("");
   const [formRole, setFormRole] = useState<UserRole>("THERAPIST");
   const [formLocId, setFormLocId] = useState<string>("");
+  const [formShiftId, setFormShiftId] = useState<string>("");
 
   // ── Derived: role-based UI flags ─────────────────────────────────────
   const myRole = me?.role as UserRole | undefined;
@@ -90,8 +98,15 @@ export default function EmployeesPage() {
     }).catch(() => { /* ignore */ });
   }, []);
 
+  const fetchShifts = useCallback(() => {
+    fetch("/api/shifts").then(r => r.json()).then(d => {
+      if (Array.isArray(d)) setShifts(d);
+    }).catch(() => { /* ignore */ });
+  }, []);
+
   useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
   useEffect(() => { fetchLocations(); }, [fetchLocations]);
+  useEffect(() => { fetchShifts(); }, [fetchShifts]);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
@@ -99,10 +114,9 @@ export default function EmployeesPage() {
     if (!canCreate || !myRole) return;
     setEditingEmployee(null);
     setFormName(""); setFormEmail("");
-    // Default role = first allowed (CS→THERAPIST, admins→DEVELOPER etc)
     setFormRole(allowedRoles[0] || "THERAPIST");
-    // Default location: locked-to-self for CS, else empty for explicit pick
     setFormLocId(isLocationLocked && myLocationId ? myLocationId : "");
+    setFormShiftId("");
     setShowModal(true);
   };
 
@@ -111,6 +125,7 @@ export default function EmployeesPage() {
     setFormName(emp.name); setFormEmail(emp.email);
     setFormRole(emp.role);
     setFormLocId(emp.locationId || "");
+    setFormShiftId(emp.shiftId || "");
     setShowModal(true);
   };
 
@@ -121,7 +136,13 @@ export default function EmployeesPage() {
     }
     setSaving(true);
     const locName = formLocations.find((l) => l.id === formLocId)?.name || null;
-    const body = { name: formName.trim(), email: formEmail.trim(), role: formRole, locationName: locName };
+    const body = {
+      name: formName.trim(),
+      email: formEmail.trim(),
+      role: formRole,
+      locationName: locName,
+      shiftId: formShiftId || null,
+    };
     try {
       if (editingEmployee) {
         const res = await fetch(`/api/employees/${editingEmployee.id}`, {
@@ -234,7 +255,7 @@ export default function EmployeesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-kimaya-cream-dark/30 bg-kimaya-cream/20">
-                {["Karyawan", "Role", "Cabang", "Status", "Aksi"].map(h => (
+                {["Karyawan", "Role", "Cabang", "Shift", "Status", "Aksi"].map(h => (
                   <th key={h} className={cn("px-5 py-3.5 text-xs font-semibold text-kimaya-brown-light/50 uppercase tracking-wider", h === "Aksi" ? "text-center" : "text-left")}>{h}</th>
                 ))}
               </tr>
@@ -266,6 +287,13 @@ export default function EmployeesPage() {
                       </span>
                     </td>
                     <td className="px-5 py-4 text-sm text-kimaya-brown-light/60">{emp.location}</td>
+                    <td className="px-5 py-4 text-sm text-kimaya-brown-light/60">
+                      {emp.shift !== "-" ? (
+                        <span className="inline-flex items-center gap-1 text-xs bg-kimaya-cream/50 text-kimaya-brown px-2 py-0.5 rounded-full">
+                          {emp.shift}
+                        </span>
+                      ) : <span className="text-kimaya-brown-light/30">—</span>}
+                    </td>
                     <td className="px-5 py-4"><span className={cn("text-xs font-medium px-2.5 py-1 rounded-full", badge.cls)}>{badge.label}</span></td>
                     <td className="px-5 py-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
@@ -285,7 +313,7 @@ export default function EmployeesPage() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-12 text-sm text-kimaya-brown-light/40">Belum ada karyawan</td></tr>
+                <tr><td colSpan={6} className="text-center py-12 text-sm text-kimaya-brown-light/40">Belum ada karyawan</td></tr>
               )}
             </tbody>
           </table>
@@ -349,6 +377,27 @@ export default function EmployeesPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Shift picker — only relevant for THERAPIST / CS (the roles that do face attendance) */}
+                {(formRole === "THERAPIST" || formRole === "CS") && (
+                  <div>
+                    <label className="block text-sm font-medium text-kimaya-brown-light mb-2">
+                      Shift Kerja {formRole === "THERAPIST" || formRole === "CS" ? <span className="text-red-400">*</span> : null}
+                    </label>
+                    <select value={formShiftId} onChange={e => setFormShiftId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-kimaya-cream-dark bg-kimaya-cream-light text-sm text-kimaya-brown focus:outline-none focus:ring-2 focus:ring-kimaya-olive/30">
+                      <option value="">— Pilih shift —</option>
+                      {shifts.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} (absen {s.checkInStart}–{s.startTime}, kerja {s.startTime}–{s.endTime})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-kimaya-brown-light/50 mt-1.5">
+                      Karyawan hanya bisa absen masuk pada window yang ditentukan shift-nya. Telat akan dicatat untuk skoring.
+                    </p>
+                  </div>
+                )}
 
                 <div className="bg-kimaya-olive/5 border border-kimaya-olive/20 rounded-xl p-4 text-xs text-kimaya-brown-light/70 space-y-1.5">
                   <p>🔑 Kata sandi awal: <span className="font-semibold text-kimaya-brown">kimaya2026</span></p>

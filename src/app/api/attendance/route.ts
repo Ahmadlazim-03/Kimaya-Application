@@ -91,9 +91,10 @@ export async function POST(request: Request) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const now = new Date();
 
-    // ── Face verification for check-in (THERAPIST only) ──
+    // ── Face verification for check-in (THERAPIST + CS — both do face attendance) ──
+    const needsFaceScan = session.role === "THERAPIST" || session.role === "CS";
     let faceMatchScore: number | null = null;
-    if (action === "checkin" && session.role === "THERAPIST") {
+    if (action === "checkin" && needsFaceScan) {
       // Validate user has registered face
       const userFace = await prisma.user.findUnique({
         where: { id: userId },
@@ -184,15 +185,20 @@ export async function POST(request: Request) {
       }
     }
 
-    // Determine check-in/out time based on SHIFT or Global Config
-    const configRow = await prisma.systemConfig.findUnique({ where: { key: "late_tolerance_minutes" } });
-    const tolerance = parseInt(configRow?.value || "10");
-
-    // Use User's Shift if available, else fallback to global config
-    let shiftStartTime = "08:00";
-    let shiftEndTime = "17:00";
+    // ── Shift-based time logic ──
+    // Each shift has 3 anchor times:
+    //   checkInStart  → window opens (before this → EARLY status)
+    //   startTime     → window closes / shift work begins (after this → LATE)
+    //   endTime       → shift work ends (checkout before this → isEarlyDeparture)
+    //
+    // Toleran rule (per user spec): all check-ins are accepted; we just label
+    // them EARLY / ON_TIME / LATE so the scoring engine can penalize lateness.
+    let shiftCheckInStart = "09:00";
+    let shiftStartTime = "10:00";
+    let shiftEndTime = "19:00";
 
     if (user?.shift) {
+      shiftCheckInStart = user.shift.checkInStart;
       shiftStartTime = user.shift.startTime;
       shiftEndTime = user.shift.endTime;
     } else {
@@ -200,16 +206,47 @@ export async function POST(request: Request) {
       if (globalStart) shiftStartTime = globalStart.value;
     }
 
-    const [sh, sm] = shiftStartTime.split(":").map(Number);
-    const checkInDeadline = new Date(today);
-    checkInDeadline.setHours(sh, sm + tolerance, 0, 0);
+    const parseHm = (hm: string) => {
+      const [h, m] = hm.split(":").map(Number);
+      const d = new Date(today);
+      d.setHours(h, m, 0, 0);
+      return d;
+    };
+    const tsCheckInStart = parseHm(shiftCheckInStart);
+    const tsDeadline = parseHm(shiftStartTime);
+    const checkOutStandard = parseHm(shiftEndTime);
 
-    const [eh, em] = shiftEndTime.split(":").map(Number);
-    const checkOutStandard = new Date(today);
-    checkOutStandard.setHours(eh, em, 0, 0);
+    // ── Idempotency: refuse re-action once it's been done today ──
+    const existingToday = await prisma.attendance.findUnique({
+      where: { userId_date: { userId, date: today } },
+    });
+    if (action === "checkin" && existingToday?.checkInTime) {
+      return NextResponse.json({
+        error: "Anda sudah check-in hari ini. Tombol check-in dinonaktifkan.",
+      }, { status: 409 });
+    }
+    if (action === "checkout") {
+      if (!existingToday?.checkInTime) {
+        return NextResponse.json({
+          error: "Anda belum check-in hari ini. Silakan check-in terlebih dahulu.",
+        }, { status: 400 });
+      }
+      if (existingToday.checkOutTime) {
+        return NextResponse.json({
+          error: "Anda sudah check-out hari ini. Tombol check-out dinonaktifkan.",
+        }, { status: 409 });
+      }
+    }
 
     if (action === "checkin") {
-      const status = now > checkInDeadline ? "LATE" : "ON_TIME";
+      // Toleran: kapan saja boleh, tapi labelnya beda.
+      // - now < tsCheckInStart       → EARLY  (datang sebelum window dibuka)
+      // - tsCheckInStart..tsDeadline → ON_TIME (tepat waktu)
+      // - now > tsDeadline           → LATE
+      let status: "EARLY" | "ON_TIME" | "LATE";
+      if (now < tsCheckInStart) status = "EARLY";
+      else if (now <= tsDeadline) status = "ON_TIME";
+      else status = "LATE";
       const att = await prisma.attendance.upsert({
         where: { userId_date: { userId, date: today } },
         create: {
@@ -247,23 +284,27 @@ export async function POST(request: Request) {
         },
       });
 
+      const statusLabel = status === "ON_TIME" ? "Tepat Waktu"
+                        : status === "LATE"    ? `Telat (deadline ${shiftStartTime})`
+                        : `Lebih Awal (window mulai ${shiftCheckInStart})`;
+      const shiftLabel = user?.shift?.name ? ` • Shift ${user.shift.name}` : "";
       return NextResponse.json({
         id: att.id, status: att.status,
         gpsValid, distance: Math.round(distance),
         gpsRadius, faceMatchScore,
         locationName: targetLocationName,
         message: gpsValid
-          ? `✅ Check-in berhasil! Wajah ✓ • GPS ✓ (${targetLocationName}) • Shift: ${user?.shift?.name || 'Default'}`
+          ? `✅ Check-in berhasil! ${statusLabel}${shiftLabel} • GPS ✓ (${targetLocationName})`
           : latitude
-            ? `⚠️ Check-in berhasil! Wajah ✓ • GPS di luar radius (${Math.round(distance)}m dari ${targetLocationName})`
-            : `✅ Check-in berhasil! Wajah ✓`,
+            ? `⚠️ Check-in tercatat (${statusLabel})${shiftLabel} • Di luar radius cabang (${Math.round(distance)}m)`
+            : `✅ Check-in berhasil! ${statusLabel}${shiftLabel}`,
       });
     } else {
       // Check-out: Handle early departure
       const isEarly = now < checkOutStandard;
 
-      // Therapist face verification (same as check-in)
-      if (session.role === "THERAPIST") {
+      // Face verification on check-out too (THERAPIST + CS — same as check-in)
+      if (needsFaceScan) {
         if (!faceVerifyToken) return NextResponse.json({ error: "Token verifikasi wajah diperlukan." }, { status: 403 });
         const tokenData = await verifyFaceToken(faceVerifyToken, userId, selfiePhoto);
         if (!tokenData) return NextResponse.json({ error: "Token tidak valid." }, { status: 403 });

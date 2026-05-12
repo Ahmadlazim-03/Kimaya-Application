@@ -45,7 +45,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const body = await request.json();
-    const { name, email, role, locationName, status } = body;
+    const { name, email, role, locationName, status, shiftId } = body;
 
     const updateData: Record<string, unknown> = {};
     if (typeof name === "string" && name.trim()) updateData.fullName = name.trim();
@@ -92,6 +92,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         }, { status: 403 });
       }
       updateData.locationId = newLocationId;
+    }
+
+    // Shift assignment (admin only — CS already restricted above)
+    if (shiftId !== undefined) {
+      if (shiftId === null || shiftId === "") {
+        updateData.shiftId = null;
+      } else {
+        const shift = await prisma.shift.findUnique({ where: { id: shiftId } });
+        if (!shift) {
+          return NextResponse.json({ error: "Shift tidak ditemukan" }, { status: 400 });
+        }
+        updateData.shiftId = shiftId;
+      }
     }
 
     await prisma.user.update({ where: { id }, data: updateData });

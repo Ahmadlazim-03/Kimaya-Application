@@ -41,6 +41,10 @@ export async function POST(request: Request) {
       data: { lastLoginAt: new Date() },
     });
 
+    // IMPORTANT: keep the session payload slim — it gets serialized into the
+    // JWT cookie and browsers reject cookies > 4 KB. avatarUrl / facePhotoUrl
+    // are base64 data URLs that easily exceed that, so they live in the DB
+    // and are fetched via /api/auth/me when the UI needs them.
     const sessionUser = {
       id: user.id,
       email: user.email,
@@ -48,8 +52,6 @@ export async function POST(request: Request) {
       role: user.role,
       departmentId: user.departmentId || undefined,
       locationId: user.locationId || undefined,
-      avatarUrl: user.avatarUrl || undefined,
-      facePhotoUrl: user.facePhotoUrl || undefined,
     };
 
     const token = await createSession(sessionUser);

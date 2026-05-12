@@ -181,11 +181,16 @@ model User {
 }
 
 model Shift {
-  id          String   @id @default(uuid())
-  name        String   @db.VarChar(50) // e.g., "Pagi", "Siang"
-  startTime   String   @map("start_time") // e.g., "09:00"
-  endTime     String   @map("end_time")   // e.g., "18:00"
-  description String?  @db.Text
+  id            String   @id @default(uuid())
+  name          String   @db.VarChar(50) // e.g., "Pagi", "Malam"
+  // Window where check-in is considered ON_TIME.
+  // - Before checkInStart  → EARLY  (allowed; flagged for scoring)
+  // - Between checkInStart and startTime → ON_TIME
+  // - After startTime → LATE (allowed; flagged for scoring)
+  checkInStart  String   @map("check_in_start") @default("09:00") // e.g., "09:30"
+  startTime     String   @map("start_time")   // e.g., "10:00" — deadline, shift work begins
+  endTime       String   @map("end_time")     // e.g., "19:00" — shift work ends
+  description   String?  @db.Text
 
   users       User[]
   attendances Attendance[]

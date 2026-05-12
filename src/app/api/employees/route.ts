@@ -43,6 +43,7 @@ export async function GET(request: Request) {
         id: true, email: true, fullName: true, phone: true, role: true,
         status: true, joinDate: true, avatarUrl: true, facePhotoUrl: true,
         location: { select: { id: true, name: true } },
+        shift: { select: { id: true, name: true } },
       },
       orderBy: { fullName: "asc" },
     });
@@ -55,12 +56,11 @@ export async function GET(request: Request) {
       role: e.role,
       location: e.location?.name || "-",
       locationId: e.location?.id || null,
+      shift: e.shift?.name || "-",
+      shiftId: e.shift?.id || null,
       status: e.status.toLowerCase(),
       joinDate: e.joinDate?.toISOString().split("T")[0] || "-",
-      // Initials for fallback when no photo exists.
       avatar: e.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
-      // Real photo URL — frontend shows it if present, else falls back to initials.
-      // Self-uploaded avatar wins over the onboarding face photo.
       avatarUrl: e.avatarUrl || e.facePhotoUrl || null,
     }));
 
@@ -89,6 +89,7 @@ export async function POST(request: Request) {
     const email = String(body.email || "").trim().toLowerCase();
     const requestedRole = String(body.role || "THERAPIST") as UserRole;
     const locationName = body.locationName ? String(body.locationName) : null;
+    const shiftId = body.shiftId ? String(body.shiftId) : null;
 
     if (!name) return NextResponse.json({ error: "Nama wajib diisi" }, { status: 400 });
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -142,15 +143,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email sudah terdaftar" }, { status: 409 });
     }
 
+    // Validate shift if provided.
+    if (shiftId) {
+      const shift = await prisma.shift.findUnique({ where: { id: shiftId } });
+      if (!shift) {
+        return NextResponse.json({ error: "Shift tidak ditemukan" }, { status: 400 });
+      }
+    }
+
     const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
-    // Only therapists go through face-verification onboarding.
-    const needsOnboarding = requestedRole === "THERAPIST";
+    // Both THERAPIST and CS do face-scan attendance, so they must complete
+    // the face-onboarding flow on first login. MANAGER and DEVELOPER skip it.
+    const needsOnboarding = requestedRole === "THERAPIST" || requestedRole === "CS";
 
     const user = await prisma.user.create({
       data: {
         fullName: name,
         email,
         locationId,
+        shiftId,
         role: requestedRole,
         status: "ACTIVE",
         passwordHash,

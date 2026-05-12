@@ -66,13 +66,13 @@ export async function PUT(request: Request) {
       },
     });
 
-    // Re-issue session so the header / sidebar shows new name + avatar.
+    // Re-issue session so the header / sidebar shows new name. Photos are
+    // intentionally NOT in the JWT — they're fetched fresh from /api/auth/me
+    // (DB) so the cookie stays under the 4 KB browser limit.
     const newToken = await createSession({
       id: updated.id, email: updated.email, fullName: updated.fullName, role: updated.role,
       departmentId: updated.departmentId || undefined,
       locationId: updated.locationId || undefined,
-      avatarUrl: updated.avatarUrl || undefined,
-      facePhotoUrl: updated.facePhotoUrl || undefined,
     });
     await setSessionCookie(newToken);
 

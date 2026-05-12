@@ -95,6 +95,7 @@ export async function POST(request: Request) {
     });
 
     // ── Auto-login after registration ──
+    // Slim session — photos live in DB to keep cookie under 4 KB.
     const sessionUser: SessionUser = {
       id: user.id,
       email: user.email,
@@ -102,8 +103,6 @@ export async function POST(request: Request) {
       role: user.role as UserRole,
       departmentId: undefined,
       locationId: undefined,
-      avatarUrl: undefined,
-      facePhotoUrl: user.facePhotoUrl || undefined,
     };
 
     const token = await createSession(sessionUser);

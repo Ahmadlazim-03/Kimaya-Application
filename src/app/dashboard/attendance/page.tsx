@@ -77,20 +77,27 @@ export default function AttendancePage() {
     });
   };
 
-  const handleAttendanceAction = async (userId?: string, tokenOverride?: string, photoOverride?: string) => {
+  const handleAttendanceAction = async (
+    userId?: string,
+    tokenOverride?: string,
+    photoOverride?: string,
+    actionOverride?: "checkin" | "checkout",
+  ) => {
+    // Use explicit override when provided — button onClicks pass it directly to
+    // avoid the React state-update race (calling setAttendanceAction then
+    // handleAttendanceAction in the same tick reads STALE attendanceAction).
+    const finalAction = actionOverride || attendanceAction;
     setCheckingIn(true);
     try {
       const coords = await getLocation();
       const targetUserId = userId || (records.length > 0 ? records[0].id : "");
-
-      // Use the provided photo (already stamped in handleFaceVerified) or state
       const finalPhoto = photoOverride || selfiePhoto || undefined;
 
       const res = await fetch("/api/attendance", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: targetUserId, 
-          action: attendanceAction, // Use current state (checkin or checkout)
+          userId: targetUserId,
+          action: finalAction,
           latitude: coords.lat, longitude: coords.lng,
           selfiePhoto: finalPhoto,
           faceVerifyToken: tokenOverride || faceVerifyToken,
@@ -99,7 +106,7 @@ export default function AttendancePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        showToast(`❌ ${data.error || `Gagal ${attendanceAction}`}`);
+        showToast(`❌ ${data.error || `Gagal ${finalAction}`}`);
         if (res.status === 403) {
           setSelfiePhoto(null);
           setFaceVerified(false);
@@ -107,7 +114,7 @@ export default function AttendancePage() {
           setFaceVerifyToken(null);
         }
       } else {
-        if (attendanceAction === "checkin") {
+        if (finalAction === "checkin") {
           setGpsResult({ distance: data.distance, gpsValid: data.gpsValid, gpsRadius: data.gpsRadius });
         }
         showToast(data.message);
@@ -168,9 +175,11 @@ export default function AttendancePage() {
         setFaceChecking(false);
         showToast(`✅ Wajah terverifikasi (${data.matchScore}%)! Memproses ${attendanceAction}...`);
 
-        // 3. Auto-trigger attendance action (checkin/checkout)
+        // 3. Auto-trigger attendance action (checkin/checkout) — explicit action
+        // so the call doesn't race with the setAttendanceAction state update.
+        const finalAction = attendanceAction;
         setTimeout(() => {
-          handleAttendanceAction(undefined, data.token, photoToUse);
+          handleAttendanceAction(undefined, data.token, photoToUse, finalAction);
         }, 500);
       } else {
         setFaceChecking(false);
@@ -233,88 +242,123 @@ export default function AttendancePage() {
           </div>
         </motion.div>
 
-        {/* GPS Check-in/Out Card — only for THERAPIST (face-scan attendance) */}
-        {user?.role === "THERAPIST" && (
+        {/* Face + GPS Attendance Card — for THERAPIST and CS (both do face attendance) */}
+        {(user?.role === "THERAPIST" || user?.role === "CS") && (
           <motion.div variants={item} className="bg-gradient-to-r from-kimaya-olive/10 to-kimaya-cream rounded-2xl p-6 border border-kimaya-olive/20">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center shadow-sm">
-                  {hasCheckedIn && !hasCheckedOut ? (
-                    <LogOut size={24} className="text-amber-600" />
-                  ) : (
-                    <Navigation size={24} className="text-kimaya-olive" />
-                  )}
+            <div className="flex flex-col gap-5">
+              {/* Header */}
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center shadow-sm flex-shrink-0">
+                  <Navigation size={24} className="text-kimaya-olive" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-serif text-kimaya-brown">
-                    {!hasCheckedIn ? "Check-in GPS + Face" : !hasCheckedOut ? "Check-out GPS + Face" : "Absensi Hari Ini Selesai"}
-                  </h3>
-                  <p className="text-sm text-kimaya-brown-light/60 mt-0.5">
-                    {hasCheckedIn && hasCheckedOut 
-                      ? "Terima kasih, Anda sudah melakukan absensi masuk dan pulang hari ini."
-                      : gpsStatus === "idle" && !faceVerified && `Langkah 1: Verifikasi wajah untuk ${!hasCheckedIn ? 'masuk' : 'pulang'}`
-                    }
-                    {gpsStatus === "idle" && faceVerified && `Wajah ✓ — Klik GPS ${!hasCheckedIn ? 'Check-in' : 'Check-out'} untuk absen`}
-                    {gpsStatus === "loading" && "📡 Mendapatkan lokasi GPS..."}
-                    {gpsStatus === "success" && gpsCoords && `📍 Lat: ${gpsCoords.lat.toFixed(6)}, Lng: ${gpsCoords.lng.toFixed(6)}`}
-                    {gpsStatus === "error" && "❌ GPS gagal. Aktifkan izin lokasi di browser."}
-                  </p>
-                  {gpsResult && !hasCheckedOut && (
-                    <div className="flex items-center gap-2 mt-1">
-                      {gpsResult.gpsValid
-                        ? <span className="text-xs text-kimaya-olive flex items-center gap-1"><ShieldCheck size={12} /> Lokasi terverifikasi ({gpsResult.distance}m)</span>
-                        : <span className="text-xs text-amber-600 flex items-center gap-1"><ShieldAlert size={12} /> Di luar radius ({gpsResult.distance}m / max {gpsResult.gpsRadius}m)</span>
-                      }
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-serif text-kimaya-brown">Absensi Hari Ini</h3>
+                  {user?.shift ? (
+                    <p className="text-xs text-kimaya-brown-light/60 mt-0.5">
+                      Shift <strong>{user.shift.name}</strong> · masuk {user.shift.startTime} · pulang {user.shift.endTime}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600 mt-0.5">⚠️ Belum ada shift — hubungi admin untuk set shift Anda.</p>
                   )}
-                  {/* Face verification badge */}
+                  {/* Status hints */}
+                  <p className="text-xs text-kimaya-brown-light/60 mt-1.5">
+                    {hasCheckedIn && hasCheckedOut
+                      ? "✅ Sudah selesai absen masuk & pulang hari ini."
+                      : !hasCheckedIn
+                        ? "Langkah 1: verifikasi wajah → Langkah 2: Check-in"
+                        : "Langkah 1: verifikasi wajah → Langkah 2: Check-out"}
+                  </p>
+                  {gpsStatus === "loading" && (
+                    <p className="text-xs text-blue-600 mt-1">📡 Mendapatkan lokasi GPS…</p>
+                  )}
+                  {gpsStatus === "error" && (
+                    <p className="text-xs text-red-500 mt-1">❌ GPS gagal. Aktifkan izin lokasi di browser/aplikasi.</p>
+                  )}
+                  {gpsResult && !hasCheckedOut && (
+                    <p className="text-xs mt-1">
+                      {gpsResult.gpsValid
+                        ? <span className="text-kimaya-olive flex items-center gap-1"><ShieldCheck size={12} /> Lokasi terverifikasi ({gpsResult.distance}m)</span>
+                        : <span className="text-amber-600 flex items-center gap-1"><ShieldAlert size={12} /> Di luar radius ({gpsResult.distance}m / max {gpsResult.gpsRadius}m)</span>
+                      }
+                    </p>
+                  )}
                   {faceChecking && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs text-blue-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Membandingkan wajah...</span>
-                    </div>
+                    <p className="text-xs text-blue-500 flex items-center gap-1 mt-1"><Loader2 size={12} className="animate-spin" /> Membandingkan wajah…</p>
                   )}
                   {faceVerified && faceMatchScore !== null && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs text-kimaya-olive flex items-center gap-1"><ScanFace size={12} /> Wajah cocok ({faceMatchScore}%)</span>
-                    </div>
+                    <p className="text-xs text-kimaya-olive flex items-center gap-1 mt-1"><ScanFace size={12} /> Wajah cocok ({faceMatchScore}%) — siap absen</p>
                   )}
                 </div>
               </div>
-              
-              {!hasCheckedOut && (
-                <div className="flex items-center gap-2">
-                  {/* Face Verify Button */}
-                  <motion.button whileTap={{ scale: 0.97 }} 
+
+              {/* Verifikasi wajah row — disembunyikan kalau sudah selesai check-in+out */}
+              {!(hasCheckedIn && hasCheckedOut) && (
+                <div className="flex justify-start">
+                  <motion.button whileTap={{ scale: 0.97 }}
                     onClick={() => {
+                      // Verifikasi wajah memicu aksi default: check-in jika belum, else check-out.
                       setAttendanceAction(!hasCheckedIn ? "checkin" : "checkout");
                       setShowFaceCapture(true);
                     }}
+                    disabled={checkingIn || stampingPhoto}
                     className={cn(
-                      "px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 transition-all",
+                      "px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-all border",
                       faceVerified
-                        ? "bg-green-50 text-green-600 border border-green-200"
-                        : "bg-white text-kimaya-olive border border-kimaya-olive/30 hover:bg-kimaya-olive/5"
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                        : "bg-white text-kimaya-olive border-kimaya-olive/30 hover:bg-kimaya-olive/5"
                     )}>
                     <ScanFace size={16} />
-                    {faceVerified ? "Wajah ✓" : "Verifikasi Wajah"}
-                  </motion.button>
-                  {/* Attendance Button */}
-                  <motion.button whileTap={{ scale: 0.97 }} 
-                    onClick={() => handleAttendanceAction()} 
-                    disabled={checkingIn || !faceVerified || stampingPhoto}
-                    className={cn(
-                      "px-6 py-3 rounded-xl text-white text-sm font-medium transition-all shadow-lg flex items-center gap-2 disabled:opacity-50",
-                      !hasCheckedIn ? "bg-kimaya-olive hover:bg-kimaya-olive-dark shadow-kimaya-olive/20" : "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
-                    )}>
-                    {checkingIn || stampingPhoto ? <Loader2 size={16} className="animate-spin" /> : (!hasCheckedIn ? <MapPin size={16} /> : <LogOut size={16} />)}
-                    {stampingPhoto ? "Memproses foto..." : checkingIn ? "Memproses..." : (!hasCheckedIn ? "Check-in GPS" : "Check-out GPS")}
+                    {faceVerified ? "Wajah Terverifikasi ✓" : "Verifikasi Wajah Dulu"}
                   </motion.button>
                 </div>
               )}
 
+              {/* Dua tombol terpisah: Check-in & Check-out */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* CHECK-IN */}
+                <motion.button whileTap={{ scale: 0.97 }}
+                  onClick={() => { setAttendanceAction("checkin"); handleAttendanceAction(undefined, undefined, undefined, "checkin"); }}
+                  disabled={hasCheckedIn || !faceVerified || checkingIn || stampingPhoto}
+                  className={cn(
+                    "px-6 py-4 rounded-xl text-white text-sm font-semibold transition-all shadow-lg flex items-center justify-center gap-2",
+                    "bg-kimaya-olive hover:bg-kimaya-olive-dark shadow-kimaya-olive/20",
+                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+                  )}>
+                  {checkingIn && attendanceAction === "checkin"
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : hasCheckedIn ? <Check size={16} /> : <MapPin size={16} />}
+                  {hasCheckedIn
+                    ? `Sudah Masuk · ${myRecord?.checkIn}`
+                    : checkingIn && attendanceAction === "checkin"
+                      ? "Memproses Check-in…"
+                      : "Check-in (Masuk)"}
+                </motion.button>
+
+                {/* CHECK-OUT */}
+                <motion.button whileTap={{ scale: 0.97 }}
+                  onClick={() => { setAttendanceAction("checkout"); handleAttendanceAction(undefined, undefined, undefined, "checkout"); }}
+                  disabled={!hasCheckedIn || hasCheckedOut || !faceVerified || checkingIn || stampingPhoto}
+                  className={cn(
+                    "px-6 py-4 rounded-xl text-white text-sm font-semibold transition-all shadow-lg flex items-center justify-center gap-2",
+                    "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20",
+                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+                  )}>
+                  {checkingIn && attendanceAction === "checkout"
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : hasCheckedOut ? <Check size={16} /> : <LogOut size={16} />}
+                  {hasCheckedOut
+                    ? `Sudah Pulang · ${myRecord?.checkOut}`
+                    : !hasCheckedIn
+                      ? "Check-out (perlu masuk dulu)"
+                      : checkingIn && attendanceAction === "checkout"
+                        ? "Memproses Check-out…"
+                        : "Check-out (Pulang)"}
+                </motion.button>
+              </div>
+
               {hasCheckedIn && hasCheckedOut && (
-                <div className="px-6 py-3 rounded-xl bg-kimaya-olive/10 text-kimaya-olive text-sm font-medium flex items-center gap-2 border border-kimaya-olive/20">
-                  <Check size={18} /> Absensi Selesai
+                <div className="px-4 py-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium flex items-center gap-2 border border-emerald-200">
+                  <Check size={16} /> Absensi hari ini selesai · Sampai jumpa besok!
                 </div>
               )}
             </div>

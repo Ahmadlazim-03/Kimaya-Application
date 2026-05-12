@@ -51,24 +51,100 @@ async function main() {
     data: { attendanceWeight: 30, reportCompletenessWeight: 25, reportQualityWeight: 20, responseSpeedWeight: 15, initiativeWeight: 10, thresholdAlert: 70 },
   });
 
-  const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 12);
-  await prisma.user.create({
-    data: { 
-      email: "developer@kimayaexperience.com", 
-      fullName: "System Developer", 
-      phone: "+6280000000000", 
-      role: "DEVELOPER", 
-      status: "ACTIVE", 
-      departmentId: depts["IT Support"].id, 
-      locationId: locs["Kimaya Spa Gading Serpong"].id, 
-      passwordHash: hashedPassword, 
-      onboardingCompleted: true 
+  // Shifts — only 2 active shifts. Window between checkInStart and startTime
+  // counts as ON_TIME. Before checkInStart → EARLY; after startTime → LATE.
+  const shiftPagi = await prisma.shift.create({
+    data: {
+      name: "Pagi",
+      checkInStart: "09:30",
+      startTime: "10:00",
+      endTime: "19:00",
+      description: "Shift Pagi: window check-in 09:30–10:00, kerja 10:00–19:00",
+    },
+  });
+  const shiftMalam = await prisma.shift.create({
+    data: {
+      name: "Malam",
+      checkInStart: "12:30",
+      startTime: "13:00",
+      endTime: "22:00",
+      description: "Shift Malam: window check-in 12:30–13:00, kerja 13:00–22:00",
     },
   });
 
-  console.log(`🔑 Default password for Developer (developer@kimayaexperience.com): ${DEFAULT_PASSWORD}`);
-  console.log("✅ Database seeded: system config, departments, locations, score config, and root developer");
-  console.log("ℹ️  Login as Developer to add more accounts via /dashboard/employees");
+  const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 12);
+
+  // One seed account per role so the team can smoke-test the full flow
+  // without manually creating users. All passwords are kimaya2026.
+  const defaultLocationId = locs["Kimaya Spa Gading Serpong"].id;
+
+  await prisma.user.create({
+    data: {
+      email: "developer@kimayaexperience.com",
+      fullName: "System Developer",
+      phone: "+6280000000000",
+      role: "DEVELOPER",
+      status: "ACTIVE",
+      departmentId: depts["IT Support"].id,
+      locationId: defaultLocationId,
+      passwordHash: hashedPassword,
+      onboardingCompleted: true,
+    },
+  });
+
+  await prisma.user.create({
+    data: {
+      email: "manager@kimayaexperience.com",
+      fullName: "Manager Kimaya",
+      phone: "+6281000000001",
+      role: "MANAGER",
+      status: "ACTIVE",
+      departmentId: depts["Operations"].id,
+      locationId: defaultLocationId,
+      passwordHash: hashedPassword,
+      onboardingCompleted: true,
+    },
+  });
+
+  await prisma.user.create({
+    data: {
+      email: "cs@kimayaexperience.com",
+      fullName: "Customer Service Kimaya",
+      phone: "+6281000000002",
+      role: "CS",
+      status: "ACTIVE",
+      departmentId: depts["Front Desk"].id,
+      locationId: defaultLocationId,
+      // CS now does face-attendance too, so they MUST onboard their face.
+      // Leave onboardingCompleted false so first login goes through the
+      // face-registration flow.
+      onboardingCompleted: false,
+      shiftId: shiftPagi.id,
+      passwordHash: hashedPassword,
+    },
+  });
+
+  await prisma.user.create({
+    data: {
+      email: "therapist@kimayaexperience.com",
+      fullName: "Therapist Kimaya",
+      phone: "+6281000000003",
+      role: "THERAPIST",
+      status: "ACTIVE",
+      departmentId: depts["Spa Therapist"].id,
+      locationId: defaultLocationId,
+      onboardingCompleted: false, // Goes through face onboarding on first login
+      shiftId: shiftPagi.id,
+      passwordHash: hashedPassword,
+    },
+  });
+
+  console.log("✅ Seeded shifts: Pagi (09:30→10:00, kerja 10–19), Malam (12:30→13:00, kerja 13–22)");
+  console.log("✅ Seeded 4 accounts (password: kimaya2026):");
+  console.log("   - developer@kimayaexperience.com  (DEVELOPER)");
+  console.log("   - manager@kimayaexperience.com    (MANAGER)");
+  console.log("   - cs@kimayaexperience.com         (CS, shift Pagi, perlu onboarding wajah)");
+  console.log("   - therapist@kimayaexperience.com  (THERAPIST, shift Pagi, perlu onboarding wajah)");
 }
 
 main()

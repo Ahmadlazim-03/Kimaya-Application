@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Bell, Calendar, ChevronDown, User, Settings, LogOut, Menu, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -118,8 +120,19 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
           <motion.button whileTap={{ scale: 0.97 }}
             onClick={() => { setShowProfile(!showProfile); setShowNotif(false); }}
             className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl hover:bg-kimaya-cream transition-colors">
-            <div className="w-8 h-8 rounded-full bg-kimaya-olive flex items-center justify-center text-kimaya-cream text-xs font-semibold">
-              {userInitials}
+            <div className="w-8 h-8 rounded-full bg-kimaya-olive flex items-center justify-center text-kimaya-cream text-xs font-semibold overflow-hidden relative">
+              {user?.avatarUrl || user?.facePhotoUrl ? (
+                <Image
+                  src={(user.avatarUrl || user.facePhotoUrl) as string}
+                  alt={user?.fullName || "Profil"}
+                  fill
+                  sizes="32px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                userInitials
+              )}
             </div>
             <span className="hidden sm:inline text-sm font-medium text-kimaya-brown">{user?.fullName?.split(" ")[0] || "User"}</span>
             <motion.div animate={{ rotate: showProfile ? 180 : 0 }} transition={{ duration: 0.2 }}>
@@ -142,13 +155,15 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
                   </div>
                 </div>
                 <div className="py-1">
-                  <a href="/dashboard/settings/profile" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-kimaya-brown hover:bg-kimaya-cream/50 transition-colors">
+                  <Link href="/dashboard/settings/profile" onClick={() => setShowProfile(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-kimaya-brown hover:bg-kimaya-cream/50 transition-colors">
                     <User size={16} strokeWidth={1.5} /> Profil Saya
-                  </a>
+                  </Link>
                   {isAdmin && (
-                    <a href="/dashboard/settings" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-kimaya-brown hover:bg-kimaya-cream/50 transition-colors">
+                    <Link href="/dashboard/settings" onClick={() => setShowProfile(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-kimaya-brown hover:bg-kimaya-cream/50 transition-colors">
                       <Settings size={16} strokeWidth={1.5} /> Pengaturan Sistem
-                    </a>
+                    </Link>
                   )}
                 </div>
                 <div className="border-t border-kimaya-cream-dark/20 py-1">

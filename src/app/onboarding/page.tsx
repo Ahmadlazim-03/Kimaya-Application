@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAuth } from "@/lib/AuthContext";
 import dynamicImport from "next/dynamic";
 
@@ -75,12 +76,12 @@ export default function OnboardingPage() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-kimaya-gold/20 flex items-center justify-center">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2C8 6 4 10 4 14C4 18.4183 7.58172 22 12 22C16.4183 22 20 18.4183 20 14C20 10 16 6 12 2Z" stroke="#C5A059" strokeWidth="1.5" fill="none"/><path d="M12 8C10 11 8 13 8 15C8 17.2091 9.79086 19 12 19C14.2091 19 16 17.2091 16 15C16 13 14 11 12 8Z" fill="#C5A059" opacity="0.3"/></svg>
+            <div className="relative w-12 h-12 rounded-full overflow-hidden ring-2 ring-kimaya-gold/30 shadow-lg">
+              <Image src="/icons/kimaya-icon.png" alt="Kimaya" fill sizes="48px" className="object-cover" priority />
             </div>
             <div>
               <h1 className="text-2xl font-serif text-kimaya-cream tracking-wide">Kimaya</h1>
-              <p className="text-xs text-kimaya-gold tracking-[0.2em] uppercase">Employee Management</p>
+              <p className="text-xs text-kimaya-gold tracking-[0.2em] uppercase">Spa &bull; Beauty Experience</p>
             </div>
           </div>
         </div>
@@ -126,9 +127,9 @@ export default function OnboardingPage() {
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-kimaya-cream-light overflow-y-auto">
         <div className="w-full max-w-md animate-fade-in">
           {/* Mobile header */}
-          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-            <div className="w-10 h-10 rounded-full bg-kimaya-olive/10 flex items-center justify-center">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2C8 6 4 10 4 14C4 18.4183 7.58172 22 12 22C16.4183 22 20 18.4183 20 14C20 10 16 6 12 2Z" stroke="#5B633D" strokeWidth="1.5"/></svg>
+          <div className="lg:hidden flex flex-col items-center gap-3 mb-8">
+            <div className="relative w-16 h-16 rounded-full overflow-hidden shadow-lg ring-2 ring-kimaya-olive/20">
+              <Image src="/icons/kimaya-icon.png" alt="Kimaya" fill sizes="64px" className="object-cover" priority />
             </div>
             <h1 className="text-xl font-serif text-kimaya-brown">Onboarding</h1>
           </div>

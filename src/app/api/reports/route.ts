@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const reports = await prisma.report.findMany({
       where,
       include: {
-        user: { select: { fullName: true } },
+        user: { select: { fullName: true, avatarUrl: true, facePhotoUrl: true } },
         reviewedBy: { select: { fullName: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -42,6 +42,7 @@ export async function GET(request: Request) {
       gpsLocation: r.metadata && typeof r.metadata === "object" && "latitude" in (r.metadata as Record<string, unknown>) ? true : false,
       cleanlinessScore: r.metadata && typeof r.metadata === "object" ? (r.metadata as Record<string, unknown>).cleanlinessScore : null,
       avatar: r.user.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+      avatarUrl: r.user.avatarUrl || r.user.facePhotoUrl || null,
     }));
 
     const stats = {

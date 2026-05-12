@@ -121,16 +121,25 @@ export default function ProfileSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullName, phone, address, avatarUrl: avatar || "" }),
       });
-      const data = await res.json();
-      if (res.ok) {
+      // Server can return HTML on proxy timeout / 413 / 502 — never blindly
+      // call res.json() because that turns into the unhelpful "Tidak dapat
+      // terhubung" toast. Inspect content-type and status first.
+      const ct = res.headers.get("content-type") || "";
+      if (res.ok && ct.includes("application/json")) {
         showToast("ok", "Profil berhasil diperbarui");
         await refreshUser();
         await fetchMe();
+      } else if (ct.includes("application/json")) {
+        const data = await res.json().catch(() => null);
+        showToast("err", data?.error || `Gagal menyimpan (HTTP ${res.status})`);
+      } else if (res.status === 413) {
+        showToast("err", "Foto profil terlalu besar — coba foto yang lebih kecil");
       } else {
-        showToast("err", data.error || "Gagal menyimpan");
+        const txt = (await res.text().catch(() => "")).slice(0, 100).trim();
+        showToast("err", `Server error ${res.status}${txt ? ` — ${txt}` : ""}`);
       }
-    } catch {
-      showToast("err", "Tidak dapat terhubung ke server");
+    } catch (err) {
+      showToast("err", `Gagal terhubung: ${err instanceof Error ? err.message : "unknown"}`);
     }
     setSavingInfo(false);
   };
@@ -145,15 +154,19 @@ export default function ProfileSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword: curPwd, newPassword: newPwd, confirmPassword: confPwd }),
       });
-      const data = await res.json();
+      const ct = res.headers.get("content-type") || "";
+      const data = ct.includes("application/json") ? await res.json().catch(() => null) : null;
       if (res.ok) {
         showToast("ok", "Kata sandi berhasil diubah");
         setCurPwd(""); setNewPwd(""); setConfPwd("");
+      } else if (data?.error) {
+        showToast("err", data.error);
       } else {
-        showToast("err", data.error || "Gagal mengubah kata sandi");
+        const txt = (await res.text().catch(() => "")).slice(0, 100).trim();
+        showToast("err", `Server error ${res.status}${txt ? ` — ${txt}` : ""}`);
       }
-    } catch {
-      showToast("err", "Tidak dapat terhubung ke server");
+    } catch (err) {
+      showToast("err", `Gagal terhubung: ${err instanceof Error ? err.message : "unknown"}`);
     }
     setSavingPwd(false);
   };

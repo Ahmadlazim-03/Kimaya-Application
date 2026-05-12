@@ -10,7 +10,8 @@ import type { UserRole } from "@/lib/auth";
 
 interface Employee {
   id: string; name: string; email: string; phone: string; role: UserRole;
-  location: string; locationId: string | null; status: string; joinDate: string; avatar: string;
+  location: string; locationId: string | null; status: string; joinDate: string;
+  avatar: string; avatarUrl: string | null;
 }
 interface Location { id: string; name: string; }
 
@@ -245,7 +246,14 @@ export default function EmployeesPage() {
                   <tr key={emp.id} className="border-b border-kimaya-cream-dark/10 last:border-0 hover:bg-kimaya-cream/20 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-kimaya-olive/10 flex items-center justify-center text-xs font-semibold text-kimaya-olive">{emp.avatar}</div>
+                        <div className="w-9 h-9 rounded-full bg-kimaya-olive/10 flex items-center justify-center text-xs font-semibold text-kimaya-olive overflow-hidden flex-shrink-0">
+                          {emp.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={emp.avatarUrl} alt={emp.name} className="w-full h-full object-cover" />
+                          ) : (
+                            emp.avatar
+                          )}
+                        </div>
                         <div>
                           <p className="text-sm font-medium text-kimaya-brown">{emp.name}</p>
                           <p className="text-xs text-kimaya-brown-light/40">{emp.email}</p>

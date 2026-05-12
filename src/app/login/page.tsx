@@ -23,22 +23,34 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
+
+      // Server may return HTML (502/504 from proxy, or a crash page). Try to
+      // parse JSON first; fall back to text() so we can surface the actual
+      // status code & response snippet instead of the generic
+      // "Tidak dapat terhubung ke server" — that message hides real errors.
+      const contentType = res.headers.get("content-type") || "";
+      let payload: { error?: string; message?: string } | null = null;
+      let rawText = "";
+      if (contentType.includes("application/json")) {
+        payload = await res.json().catch(() => null);
+      } else {
+        rawText = await res.text().catch(() => "");
+      }
 
       if (res.ok) {
-        // Check if user needs onboarding (first login)
         const meRes = await fetch("/api/auth/me");
-        const meData = await meRes.json();
-        if (meData.needsOnboarding) {
-          router.push("/onboarding");
-        } else {
-          router.push("/dashboard");
-        }
+        const meData = await meRes.json().catch(() => ({}));
+        if (meData.needsOnboarding) router.push("/onboarding");
+        else router.push("/dashboard");
+      } else if (payload?.error) {
+        setError(payload.error);
       } else {
-        setError(data.error || "Login gagal");
+        const hint = rawText.slice(0, 120).replace(/\s+/g, " ").trim();
+        setError(`Server error ${res.status}${hint ? ` — ${hint}` : ""}`);
       }
-    } catch {
-      setError("Tidak dapat terhubung ke server");
+    } catch (err) {
+      // True network failure (offline, DNS, TLS handshake fail).
+      setError(`Gagal terhubung ke server: ${err instanceof Error ? err.message : "unknown"}`);
     }
     setLoading(false);
   };

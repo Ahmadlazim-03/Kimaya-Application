@@ -39,7 +39,11 @@ export async function GET(request: Request) {
 
     const employees = await prisma.user.findMany({
       where,
-      include: { location: { select: { id: true, name: true } } },
+      select: {
+        id: true, email: true, fullName: true, phone: true, role: true,
+        status: true, joinDate: true, avatarUrl: true, facePhotoUrl: true,
+        location: { select: { id: true, name: true } },
+      },
       orderBy: { fullName: "asc" },
     });
 
@@ -53,7 +57,11 @@ export async function GET(request: Request) {
       locationId: e.location?.id || null,
       status: e.status.toLowerCase(),
       joinDate: e.joinDate?.toISOString().split("T")[0] || "-",
+      // Initials for fallback when no photo exists.
       avatar: e.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+      // Real photo URL — frontend shows it if present, else falls back to initials.
+      // Self-uploaded avatar wins over the onboarding face photo.
+      avatarUrl: e.avatarUrl || e.facePhotoUrl || null,
     }));
 
     return NextResponse.json(data);

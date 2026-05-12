@@ -9,7 +9,7 @@ export async function GET() {
     const [scores, previousScores, config] = await Promise.all([
       prisma.employeeScore.findMany({
         where: { periodDate: currentMonth },
-        include: { user: { select: { fullName: true, department: { select: { name: true } } } } },
+        include: { user: { select: { fullName: true, avatarUrl: true, facePhotoUrl: true, department: { select: { name: true } } } } },
         orderBy: { totalScore: "desc" },
       }),
       prisma.employeeScore.findMany({
@@ -30,6 +30,7 @@ export async function GET() {
       name: s.user.fullName,
       dept: s.user.department?.name || "-",
       avatar: s.user.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+      avatarUrl: s.user.avatarUrl || s.user.facePhotoUrl || null,
       attendance: Number(s.attendanceScore),
       reports: Number(s.reportCompletenessScore),
       quality: Number(s.reportQualityScore),

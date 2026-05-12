@@ -20,7 +20,7 @@ export async function GET() {
       // Today's attendance
       prisma.attendance.findMany({
         where: { date: today },
-        include: { user: { select: { fullName: true } } },
+        include: { user: { select: { fullName: true, avatarUrl: true, facePhotoUrl: true } } },
       }),
 
       // Pending reports
@@ -33,14 +33,14 @@ export async function GET() {
             gte: new Date(today.getFullYear(), today.getMonth(), 1),
           },
         },
-        include: { user: { select: { fullName: true, department: { select: { name: true } } } } },
+        include: { user: { select: { fullName: true, avatarUrl: true, facePhotoUrl: true, department: { select: { name: true } } } } },
         orderBy: { totalScore: "desc" },
       }),
 
       // Recent attendance with user info
       prisma.attendance.findMany({
         where: { date: today },
-        include: { user: { select: { fullName: true } } },
+        include: { user: { select: { fullName: true, avatarUrl: true, facePhotoUrl: true } } },
         orderBy: { checkInTime: "desc" },
         take: 6,
       }),
@@ -97,6 +97,7 @@ export async function GET() {
       dept: s.user.department?.name || "-",
       score: Number(s.totalScore),
       avatar: s.user.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+      avatarUrl: s.user.avatarUrl || s.user.facePhotoUrl || null,
     }));
 
     // Recent activity
@@ -108,6 +109,7 @@ export async function GET() {
         : "-",
       status: a.status === "ON_TIME" ? "on-time" : a.status === "LATE" ? "late" : "absent",
       avatar: a.user.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+      avatarUrl: a.user.avatarUrl || a.user.facePhotoUrl || null,
     }));
 
     return NextResponse.json({

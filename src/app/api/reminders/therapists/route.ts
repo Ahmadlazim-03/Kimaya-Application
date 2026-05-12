@@ -35,6 +35,7 @@ export async function GET() {
         fullName: true,
         phone: true,
         avatarUrl: true,
+        facePhotoUrl: true,
         location: { select: { id: true, name: true } },
         _count: { select: { pushSubscriptions: true } },
       },
@@ -46,7 +47,8 @@ export async function GET() {
         id: t.id,
         name: t.fullName,
         phone: t.phone,
-        avatarUrl: t.avatarUrl,
+        // Prefer self-uploaded avatar; fall back to onboarding face photo.
+        avatarUrl: t.avatarUrl || t.facePhotoUrl || null,
         location: t.location?.name || null,
         locationId: t.location?.id || null,
         pushReady: t._count.pushSubscriptions > 0,

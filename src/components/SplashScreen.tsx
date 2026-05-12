@@ -28,9 +28,12 @@ export default function SplashScreen() {
 
   useEffect(() => {
     if (!shouldShow) return;
-    // Logo flies in: 0 → 800 ms; holds 800 → 1600 ms; fade 1600 → 2100 ms.
-    const fadeTimer = setTimeout(() => setPhase("fading"), 1600);
-    const doneTimer = setTimeout(() => setPhase("gone"), 2100);
+    // Logo bounces in: 0 → 800 ms
+    // Tagline + dots: 800 → 1400 ms
+    // Hold the brand mark: 1400 → 3000 ms (longer breathing room)
+    // Fade out: 3000 → 3700 ms
+    const fadeTimer = setTimeout(() => setPhase("fading"), 3000);
+    const doneTimer = setTimeout(() => setPhase("gone"), 3700);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(doneTimer);
@@ -42,7 +45,7 @@ export default function SplashScreen() {
   return (
     <div
       aria-hidden="true"
-      style={{ transition: "opacity 500ms ease" }}
+      style={{ transition: "opacity 700ms ease" }}
       className={[
         "fixed inset-0 z-[9999] flex flex-col items-center justify-center",
         "bg-kimaya-brown",

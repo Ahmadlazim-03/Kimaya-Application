@@ -57,6 +57,11 @@ const ROLE_PAGES: Record<string, UserRole[]> = {
   "/dashboard/reminders/my":         ["THERAPIST"],
   "/dashboard/employees":  ["DEVELOPER", "MANAGER", "CS"],
   "/dashboard/settings":   ["DEVELOPER", "MANAGER"],
+  // Self-service profile is for EVERY role. Must be listed explicitly because
+  // canAccess() picks the longest matching prefix — without this entry,
+  // /dashboard/settings/profile falls back to /dashboard/settings (admin only)
+  // and CS / THERAPIST get bounced when they click "Profil Saya".
+  "/dashboard/settings/profile": ["DEVELOPER", "MANAGER", "CS", "THERAPIST"],
   "/dashboard/locations":  ["DEVELOPER", "MANAGER"],
   "/dashboard/monitoring": ["DEVELOPER", "MANAGER"],
   "/dashboard/leaves":     ["DEVELOPER", "MANAGER", "CS", "THERAPIST"],
